@@ -1,0 +1,543 @@
+/**
+ * YouSync Admin Styles
+ *
+ * @package YouSync
+ */
+
+/* Sync Rules Container */
+
+
+
+.ys-sync-rule-header {
+  align-items: center;
+	display: flex;
+	justify-content: space-between;
+	margin-bottom: 1.5rem;
+}
+
+/* Toggle Switch */
+.ys-toggle {
+	display: inline-flex !important;
+	align-items: center;
+	cursor: pointer;
+	margin: 0;
+}
+
+.ys-toggle input[type="checkbox"] {
+	position: absolute;
+	opacity: 0;
+	width: 0;
+	height: 0;
+}
+
+.ys-toggle-slider {
+	position: relative;
+	display: inline-block;
+	width: 40px;
+	height: 20px;
+	background-color: #d63638;
+	border-radius: 10px;
+	transition: background-color 0.3s;
+	margin-right: 8px;
+}
+
+.ys-toggle-slider::before {
+	content: "";
+	position: absolute;
+	height: 16px;
+	width: 16px;
+	left: 2px;
+	bottom: 2px;
+	background-color: #fff;
+	border-radius: 50%;
+	transition: transform 0.3s;
+}
+
+.ys-toggle input[type="checkbox"]:checked + .ys-toggle-slider {
+	background-color: #2271b1;
+}
+
+.ys-toggle input[type="checkbox"]:checked + .ys-toggle-slider::before {
+	transform: translateX(20px);
+}
+
+.ys-toggle input[type="checkbox"]:focus + .ys-toggle-slider {
+	box-shadow: 0 0 0 2px #2271b1;
+}
+
+.ys-toggle-label {
+	font-weight: 600;
+	color: #1d2327;
+}
+
+/* Remove Button */
+.ys-remove-rule {
+	color: #b32d2e;
+	border-color: #b32d2e;
+}
+
+.ys-remove-rule:hover,
+.ys-remove-rule:focus {
+	background: #b32d2e;
+	border-color: #b32d2e;
+	color: #fff;
+}
+
+/* Rule Body */
+.ys-sync-rule-body .form-table {
+	margin: 0;
+}
+
+.ys-sync-rule-body .form-table th {
+	width: 200px;
+	padding: 0 0 16px;
+}
+
+.ys-sync-rule-body .form-table td {
+	padding: 0 0 16px;
+}
+
+.ys-sync-rule-body .form-table tr:last-child th,
+.ys-sync-rule-body .form-table tr:last-child td {
+	padding: 0;
+}
+
+/* Custom Hours Input */
+.ys-custom-hours {
+	margin-left: 8px;
+}
+
+.ys-custom-hours-label {
+	margin-left: 4px;
+}
+
+/* Contextual Fields */
+.ys-contextual-field {
+	display: none;
+}
+
+.ys-contextual-field.ys-field-visible {
+	display: table-row;
+}
+
+/* Always show universal fields */
+.ys-contextual-field.ys-field-universal {
+	display: table-row;
+}
+
+/* Conditional Filters */
+.ys-conditional-filters {
+	margin-top: 10px;
+}
+
+
+
+.ys-condition-group-divider {
+	text-align: center;
+	margin: 20px 0;
+	position: relative;
+}
+
+.ys-condition-group-divider::before {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 0;
+	right: 0;
+	height: 1px;
+	background: #c3c4c7;
+	z-index: 0;
+}
+
+.ys-and-label {
+	display: inline-block;
+	background: #fff;
+	padding: 4px 12px;
+	font-weight: 600;
+	color: #2271b1;
+	border: 1px solid #2271b1;
+	border-radius: 3px;
+	position: relative;
+	z-index: 1;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.ys-condition-group-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 15px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid #dcdcde;
+}
+
+.ys-group-label {
+	font-weight: 600;
+	color: #1d2327;
+}
+
+.ys-remove-condition-group {
+	color: #b32d2e;
+	border-color: #b32d2e;
+}
+
+.ys-remove-condition-group:hover,
+.ys-remove-condition-group:focus {
+	background: #b32d2e;
+	border-color: #b32d2e;
+	color: #fff;
+}
+
+
+.ys-or-label {
+	display: inline-block;
+	background: #f0f0f1;
+	padding: 3px 10px;
+	margin-bottom: 8px;
+	font-weight: 500;
+	color: #646970;
+	border-radius: 3px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.ys-condition-fields {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.ys-condition-field,
+.ys-condition-operator {
+	flex: 0 0 180px;
+}
+
+.ys-condition-value,
+.ys-condition-value2 {
+	flex: 1;
+	min-width: 120px;
+}
+
+.ys-remove-condition {
+	flex: 0 0 auto;
+	padding: 4px 8px;
+	min-width: 0;
+	color: #b32d2e;
+	border-color: #b32d2e;
+}
+
+.ys-remove-condition:hover,
+.ys-remove-condition:focus {
+	background: #b32d2e;
+	border-color: #b32d2e;
+	color: #fff;
+}
+
+.ys-remove-condition .dashicons {
+	width: 16px;
+	height: 16px;
+	font-size: 16px;
+	line-height: 1;
+}
+
+.ys-add-condition {
+	margin-top: 8px;
+}
+
+.ys-add-condition-group {
+	margin-top: 10px;
+}
+
+/* Form Field Styling */
+.ys-sync-rule select,
+.ys-sync-rule input[type="text"],
+.ys-sync-rule input[type="number"] {
+	max-width: 100%;
+}
+
+.ys-sync-rule .description {
+	margin-top: 5px;
+	margin-bottom: 0;
+}
+
+/* Loading State */
+.ys-loading {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+/* Error State */
+.ys-error {
+	border-color: #b32d2e;
+	background-color: #fcf0f1;
+}
+
+.ys-error-message {
+	color: #b32d2e;
+	margin-top: 8px;
+	font-weight: 600;
+}
+
+/* Success State */
+.ys-success-message {
+	color: #00a32a;
+	margin-top: 8px;
+	font-weight: 600;
+}
+
+/* Empty State */
+.ys-empty-state {
+	text-align: center;
+	padding: 40px 20px;
+	color: #646970;
+}
+
+.ys-empty-state-icon {
+	font-size: 48px;
+	opacity: 0.3;
+	margin-bottom: 15px;
+}
+
+/* Custom Meta Repeater */
+.ys-custom-meta-repeater {
+	margin-bottom: 10px;
+}
+
+.ys-custom-meta-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.ys-custom-meta-row input[type="text"] {
+	flex: 1;
+	min-width: 150px;
+}
+
+.ys-custom-meta-row .button {
+	flex: 0 0 auto;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+	.ys-sync-rule-header {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 10px;
+	}
+
+	.ys-remove-rule {
+		align-self: flex-end;
+	}
+
+	.ys-sync-rule-body .form-table th {
+		width: 100%;
+	}
+
+	.ys-condition-fields {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.ys-condition-field,
+	.ys-condition-operator,
+	.ys-condition-value,
+	.ys-condition-value2 {
+		flex: 1 1 auto;
+		width: 100%;
+	}
+
+	.ys-remove-condition {
+		align-self: flex-end;
+	}
+}
+
+.ys {
+	&-d {
+		&-block {
+			display: block !important;
+		}
+	}
+	&-my {
+		&-3 {
+			margin-bottom: 1rem !important;
+			margin-top: 1rem !important;
+		}
+		&-4 {
+			margin-bottom: 1.5rem !important;
+			margin-top: 1.5rem !important;
+		}
+	}
+	&-mt {
+		&-3 {
+			margin-top: 1rem !important;
+		}
+		&-4 {
+			margin-top: 1.5rem !important;
+		}
+	}
+	&-mb {
+		&-0 {
+			margin-bottom: 0 !important;
+		}
+		&-3 {
+			margin-bottom: 1rem !important;
+		}
+		&-4 {
+			margin-bottom: 1.5rem !important;
+		}
+	}
+
+	&-font {
+		&-normal {
+			font-weight: normal;
+		}
+	}
+
+	&-hidden {
+		display: none;
+	}
+
+	&-fieldset {
+		legend {
+			font-weight: normal;
+		}
+	}
+
+  &-form-group {
+    margin-bottom: 1rem;
+  }
+
+  &-text,
+	&-number,
+  &-select {
+		display: block;
+    width: 100%;
+  }
+
+  &-text,
+	&-number {
+		&::placeholder,
+		&:disabled::placeholder {
+			color: #ccc;
+		}
+	}
+
+  &-2-columns {
+    display: flex;
+    gap: 1rem;
+
+    > * {
+      width: 50%;
+    }
+  }
+	&-3-columns {
+    display: flex;
+    gap: 1rem;
+
+    > * {
+      width: 33.3%;
+    }
+  }
+
+	&-sync-rules {
+		margin-bottom: 1rem;
+		width: 95%;
+
+		&:empty::before {
+			border: 1px solid #ccc;
+			border-radius: 4px;
+			content: 'No sync rules set';
+			display: block;
+			padding: .5rem 1rem;
+			text-align: center;
+		}
+	}
+
+	&-sync-rule {
+		background: #fff;
+		border: 1px solid #8c8f94;
+		border-radius: 4px;
+		margin-bottom: 15px;
+		padding: 1.25rem;
+		transition: opacity .3s;
+
+		&.ys-pre-remove {
+			opacity: 0;
+			overflow: hidden;
+		}
+	}
+
+	// &-conditions-wrapper {
+	// 	legend {
+	// 		font-weight: normal;
+	// 		margin-bottom: .5rem;
+	// 	}
+	// }
+
+	&-conditions {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+
+		&:empty::before {
+			border: 1px solid #ccc;
+			border-radius: 4px;
+			content: 'No conditions set';
+			display: block;
+			padding: .5rem 1rem;
+			text-align: center;
+		}
+
+		.ys-condition {
+			padding-right: calc(30px + 1rem);
+			position: relative;
+			transition: opacity .3s;
+
+			&.ys-pre-remove {
+				opacity: 0;
+				overflow: hidden;
+			}
+
+			.ys-condition-actions {
+				align-items: center;
+				bottom: 0;
+				display: flex;
+				gap: 1rem;
+				justify-content: end;
+				position: absolute;
+				right: 0;
+				text-align: center;
+				width: 30px;
+
+				button,
+				button:hover,
+				button:focus,
+				button:active {
+					align-items: center;
+					border: 0;
+					color: #d63638;
+					display: flex;
+					justify-content: center;
+					width: 30px;
+				}
+			}
+		}
+	}
+}
+
+.dashicons {
+	pointer-events: none;
+}
+
+.ts-wrapper {
+	&.multi .ts-control {
+		.item {
+			background-color: #E6F2E8;
+		}
+	}
+}
