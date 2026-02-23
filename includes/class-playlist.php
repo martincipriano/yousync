@@ -174,10 +174,10 @@ class Playlist {
 		}
 
 		wp_enqueue_style('tom-select', 'https://cdnjs.cloudflare.com/ajax/libs/tom-select/2.4.3/css/tom-select.min.css', array(), '2.4.3');
-		wp_enqueue_style('yousync-admin', YOUSYNC_PLUGIN_URL . 'assets/css/admin.css', array( 'tom-select' ), YOUSYNC_VERSION);
+		wp_enqueue_style('yousync-admin', YOUSYNC_PLUGIN_URL . 'assets/css/admin.css', array( 'tom-select' ), filemtime(YOUSYNC_PLUGIN_DIR . 'assets/css/admin.css'));
 
 		wp_enqueue_script('tom-select', 'https://cdnjs.cloudflare.com/ajax/libs/tom-select/2.4.3/js/tom-select.complete.min.js', array(), '2.4.3', true);
-		wp_enqueue_script('yousync-admin', YOUSYNC_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery', 'tom-select' ), YOUSYNC_VERSION, true);
+		wp_enqueue_script('yousync-admin', YOUSYNC_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery', 'tom-select' ), filemtime(YOUSYNC_PLUGIN_DIR . 'assets/js/admin.js'), true);
 
 		wp_localize_script('yousync-admin', 'youSync', array(
 			'optionsChannelMetadata' => yousync_return_template_part('options', 'channel-metadata'),
