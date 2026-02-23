@@ -479,4 +479,12 @@
   background-color: #E6F2E8;
 }
 
+#col-right {
+  display: none !important;
+}
+
+#col-left {
+  width: 100% !important;
+}
+
 /*# sourceMappingURL=admin.css.map */
