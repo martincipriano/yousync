@@ -22,6 +22,9 @@ tests/e2e/.auth/
 playwright-report/
 test-results/
 
+# Environment variables
+.env
+
 # Temporary files
 *.tmp
 *.temp
