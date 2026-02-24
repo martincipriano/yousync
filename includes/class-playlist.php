@@ -134,29 +134,16 @@ class Playlist {
 	 * @return void
 	 */
 	private function render_sync_rules_section( $sync_rules = array() ) {
-
-		// Ensure at least one empty rule is always shown
-		if ( empty( $sync_rules ) ) {
-			$sync_rules = array( array() );
+		$html = '';
+		foreach ( $sync_rules as $index => $rule ) {
+			$html .= yousync_return_template_part( 'sync-rule', 'playlist', array(
+				'playlist_obj' => $this,
+				'index'        => $index,
+				'rule'         => $rule,
+			) );
 		} ?>
-
-		<div class="ys-sync-rules-header">
-			<h2>Sync Rules</h2>
-			<button type="button" class="button ys-add-rule" id="ys-add-rule">
-				<?php esc_html_e( 'Add Sync Rule', 'yousync' ); ?>
-			</button>
-		</div>
-		<div class="ys-sync-rules" id="ys-sync-rules">
-			<?php
-				foreach ( $sync_rules as $index => $rule ) {
-					yousync_get_template_part('sync-rule', 'playlist', array(
-						'playlist_obj' => $this,
-						'index' => $index,
-						'rule' => $rule,
-					));
-				}
-			?>
-		</div>
+		<p class="ys-mb-3 ys-mt-4"><strong>Sync Rules</strong> &mdash; <a class="ys-add-rule" href="#" id="ys-add-rule"><?php esc_html_e( 'Add sync rule', 'yousync' ); ?></a></p>
+		<div class="ys-sync-rules" id="ys-sync-rules"><?php echo $html; ?></div>
 		<?php
 	}
 
@@ -180,8 +167,26 @@ class Playlist {
 		wp_enqueue_script('yousync-admin', YOUSYNC_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery', 'tom-select' ), filemtime(YOUSYNC_PLUGIN_DIR . 'assets/js/admin.js'), true);
 
 		wp_localize_script('yousync-admin', 'youSync', array(
-			'optionsChannelMetadata' => yousync_return_template_part('options', 'channel-metadata'),
-			'optionsVideoMetadata'   => yousync_return_template_part('options', 'video-metadata')
+			'operators' => array(
+				'text'   => yousync_return_template_part('options', 'text-operators', array('operator' => '')),
+				'number' => yousync_return_template_part('options', 'number-operators', array('operator' => '')),
+				'date'   => yousync_return_template_part('options', 'date-operators', array('operator' => '')),
+			),
+			'values'   => array(
+				'text'   => yousync_return_template_part('input', 'text'),
+				'number' => yousync_return_template_part('input', 'number'),
+				'date'   => yousync_return_template_part('input', 'date'),
+			),
+			'syncRule' => array(
+				'playlist' => array(
+					'fieldOptions' => yousync_return_template_part('options', 'playlist-fields'),
+				),
+				'video' => array(
+					'fieldOptions' => yousync_return_template_part('options', 'video-fields'),
+				),
+				'condition' => yousync_return_template_part('sync-rule', 'condition'),
+				'rule'      => yousync_return_template_part('sync-rule-playlist'),
+			),
 		));
 	}
 
@@ -213,11 +218,28 @@ class Playlist {
 	 */
 	private function sanitize_sync_rule( $rule ) {
 		$sanitized = array(
-			'enabled'      => isset( $rule['enabled'] ) ? (bool) $rule['enabled'] : false,
-			'schedule'     => isset( $rule['schedule'] ) ? sanitize_text_field( $rule['schedule'] ) : 'daily',
-			'custom_hours' => isset( $rule['custom_hours'] ) ? absint( $rule['custom_hours'] ) : 24,
-			'strategy'     => isset( $rule['strategy'] ) ? sanitize_text_field( $rule['strategy'] ) : '',
+			'enabled'          => isset( $rule['enabled'] ) ? (bool) $rule['enabled'] : false,
+			'schedule'         => isset( $rule['schedule'] ) ? sanitize_text_field( $rule['schedule'] ) : 'daily',
+			'custom_schedule'  => isset( $rule['custom_schedule'] ) ? absint( $rule['custom_schedule'] ) : 24,
+			'action'           => isset( $rule['action'] ) ? sanitize_text_field( $rule['action'] ) : '',
+			'specific_metadata'=> isset( $rule['specific_metadata'] ) && is_array( $rule['specific_metadata'] )
+				? array_map( 'sanitize_text_field', $rule['specific_metadata'] )
+				: array(),
+			'conditions'       => array(),
 		);
+
+		if ( isset( $rule['conditions'] ) && is_array( $rule['conditions'] ) ) {
+			foreach ( $rule['conditions'] as $condition ) {
+				if ( ! is_array( $condition ) ) {
+					continue;
+				}
+				$sanitized['conditions'][] = array(
+					'field'    => isset( $condition['field'] ) ? sanitize_text_field( $condition['field'] ) : '',
+					'operator' => isset( $condition['operator'] ) ? sanitize_text_field( $condition['operator'] ) : '',
+					'value'    => isset( $condition['value'] ) ? sanitize_text_field( $condition['value'] ) : '',
+				);
+			}
+		}
 
 		return $sanitized;
 	}
@@ -251,7 +273,7 @@ class Playlist {
 	public function playlist_column_content( $content, $column_name, $term_id ) {
 		switch ( $column_name ) {
 			case 'playlist_id':
-				$playlist_id = get_term_meta( $term_id, '_playlist_id', true );
+				$playlist_id = get_term_meta( $term_id, 'playlist_id', true );
 				$content     = $playlist_id ? esc_html( $playlist_id ) : '—';
 				break;
 
