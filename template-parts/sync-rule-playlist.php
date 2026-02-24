@@ -2,6 +2,9 @@
 /**
  * Template part for displaying Playlist sync rule.
  *
+ * Mirrors sync-rule.php (Channel) in structure and attribute conventions.
+ * The only difference is the action dropdown contains Video-only options.
+ *
  * @package YouSync
  *
  * Variables available in this template:
@@ -15,17 +18,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$enabled = isset( $rule['enabled'] ) ? $rule['enabled'] : true;
-$schedule = isset( $rule['schedule'] ) ? $rule['schedule'] : 'daily';
-$custom_hours = $rule['custom_hours'] ?? 1;
-$strategy = isset( $rule['strategy'] ) ? $rule['strategy'] : '';
-$index = esc_attr( $index ); ?>
+$enabled         = isset( $rule['enabled'] ) ? $rule['enabled'] : true;
+$schedule        = isset( $rule['schedule'] ) ? $rule['schedule'] : 'daily';
+$custom_schedule = $rule['custom_schedule'] ?? 1;
+$action          = $rule['action'] ?? '';
+$conditions      = $rule['conditions'] ?? array();
 
-<div class="ys-sync-rule" data-rule-index="<?php echo $index; ?>">
+// Dual-mode: Use provided $index or fallback to {{INDEX}} placeholder for JavaScript
+$rule_index = isset( $index ) ? esc_attr( $index ) : '{{INDEX}}'; ?>
+
+<div class="ys-sync-rule" data-rule-index="<?php echo $rule_index; ?>">
 
 	<div class="ys-sync-rule-header">
 		<label class="ys-toggle">
-			<input <?php checked( $enabled, true ); ?> class="ys-rule-toggle" name="sync_rules[<?php echo $index; ?>][enabled]" type="checkbox" value="1">
+			<input <?php checked( $enabled, true ); ?> class="ys-rule-toggle" name="sync_rules[<?php echo $rule_index; ?>][enabled]" type="checkbox" value="1">
 			<span class="ys-toggle-slider"></span>
 		</label>
 		<button type="button" class="button ys-remove-rule">
@@ -36,90 +42,55 @@ $index = esc_attr( $index ); ?>
 	<div class="ys-sync-rule-body">
 		<div class="ys-2-columns">
 			<div class="ys-form-group">
-				<label for="ys-sync-schedule-<?php echo $index; ?>">Sync Schedule</label>
-				<select class="ys-select ys-sync-schedule" id="ys-sync-schedule-<?php echo $index; ?>" name="sync_rules[<?php echo $index; ?>][schedule]" required>
-					<option value="hourly" <?php selected( $schedule, 'hourly' ); ?>>Hourly</option>
-					<option value="daily" <?php selected( $schedule, 'daily' ); ?>>Daily</option>
-					<option value="weekly" <?php selected( $schedule, 'weekly' ); ?>>Weekly</option>
-					<option value="monthly" <?php selected( $schedule, 'monthly' ); ?>>Monthly</option>
-					<option value="custom" <?php selected( $schedule, 'custom' ); ?>>Custom</option>
+				<label for="ys-sync-schedule-<?php echo $rule_index; ?>">Sync Schedule</label>
+				<select class="ys-select ys-sync-schedule" id="ys-sync-schedule-<?php echo $rule_index; ?>" name="sync_rules[<?php echo $rule_index; ?>][schedule]" required>
+					<?php yousync_get_template_part( 'options', 'schedule', array( 'selected' => $schedule ) ); ?>
 				</select>
 			</div>
 			<div class="ys-form-group">
-				<label for="ys-custom-hours-<?php echo $index; ?>">Custom (Hours)</label>
-				<input class="ys-number ys-custom-sync-schedule" disabled id="ys-custom-hours-<?php echo $index; ?>" name="sync_rules[<?php echo $index; ?>][custom_schedule]" value="<?php echo esc_attr( $custom_hours ); ?>" min="1" placeholder="Eg. 24" type="number">
+				<label for="ys-custom-schedule-<?php echo $rule_index; ?>">Custom (Hours)</label>
+				<input class="ys-number ys-custom-sync-schedule" disabled id="ys-custom-schedule-<?php echo $rule_index; ?>" name="sync_rules[<?php echo $rule_index; ?>][custom_schedule]" value="<?php echo esc_attr( $custom_schedule ); ?>" min="1" placeholder="Eg. 24" type="number">
 			</div>
 		</div>
 
 		<div class="ys-form-group">
-			<label for="ys-action-<?php echo $index; ?>">Action</label>
-			<select class="ys-select ys-action" id="ys-action-<?php echo $index; ?>" name="sync_rules[<?php echo $index; ?>][strategy]" required>
-				<option disabled <?php selected( $strategy, '' ); ?> value="">Select action</option>
+			<label for="ys-action-<?php echo $rule_index; ?>">Action</label>
+			<select class="ys-select ys-action" id="ys-action-<?php echo $rule_index; ?>" name="sync_rules[<?php echo $rule_index; ?>][action]" required>
+				<option disabled <?php selected( $action, '' ); ?> value="">&mdash; Select action &mdash;</option>
+				<optgroup label="Playlist">
+					<option data-resource="playlist" value="playlist_update_all" <?php selected( $action, 'playlist_update_all' ); ?>>Update metadata for this playlist</option>
+					<option data-resource="playlist" value="playlist_update_specific" <?php selected( $action, 'playlist_update_specific' ); ?>>Update specific metadata for this playlist</option>
+				</optgroup>
 				<optgroup label="Videos">
-					<option value="videos_sync_new" <?php selected( $strategy, 'videos_sync_new' ); ?>>Sync new videos</option>
-					<option value="videos_update_all" <?php selected( $strategy, 'videos_update_all' ); ?>>Update metadata for all videos</option>
-					<option value="videos_update_non_modified" <?php selected( $strategy, 'videos_update_non_modified' ); ?>>Update metadata for non modified videos</option>
-					<option value="videos_update_specific_all" <?php selected( $strategy, 'videos_update_specific_all' ); ?>>Update specific metadata for all videos</option>
-					<option value="videos_update_specific_non_modified" <?php selected( $strategy, 'videos_update_specific_non_modified' ); ?>>Update specific metadata for non modified videos</option>
+					<option data-resource="video" value="videos_sync_new" <?php selected( $action, 'videos_sync_new' ); ?>>Sync new videos</option>
+					<option data-resource="video" value="videos_update_all" <?php selected( $action, 'videos_update_all' ); ?>>Update metadata for all videos</option>
+					<option data-resource="video" value="videos_update_non_modified" <?php selected( $action, 'videos_update_non_modified' ); ?>>Update metadata for non modified videos</option>
+					<option data-resource="video" value="videos_update_specific_all" <?php selected( $action, 'videos_update_specific_all' ); ?>>Update specific metadata for all videos</option>
+					<option data-resource="video" value="videos_update_specific_non_modified" <?php selected( $action, 'videos_update_specific_non_modified' ); ?>>Update specific metadata for non modified videos</option>
 				</optgroup>
 			</select>
 		</div>
 
-		<div class="ys-form-group ys-hidden ys-action-metadata-wrapper">
-			<label for="ys-action-metadata-<?php echo $index; ?>">Fields to Update</label>
-			<select class="ys-select ys-action-metadata" id="ys-action-metadata-<?php echo $index; ?>" name="sync_rules[<?php echo $index; ?>][fields_to_update][]" multiple placeholder="Select fields to update..."></select>
+		<div class="ys-form-group ys-hidden ys-specific-metadata-wrapper">
+			<label for="ys-specific-metadata-<?php echo $rule_index; ?>">Fields to Update</label>
+			<select class="ys-select ys-specific-metadata" id="ys-specific-metadata-<?php echo $rule_index; ?>" name="sync_rules[<?php echo $rule_index; ?>][specific_metadata][]" multiple placeholder="Select fields to update..."></select>
 		</div>
 
-		<fieldset class="ys-fieldset">
-			<legend>Conditions</legend>
-			<div class="ys-3-columns">
-				<div class="ys-form-group">
-					<label for="ys-condition-field-<?php echo $index; ?>">Field</label>
-					<select class="ys-select ys-condition-field" id="ys-condition-field-<?php echo $index; ?>" name="sync_rules[<?php echo $index; ?>][condition_field]">
-						<option value="">Select field</option>
-						<optgroup label="Video Fields" data-type="videos">
-							<option value="title" data-type="text">Title</option>
-							<option value="description" data-type="text">Description</option>
-							<option value="tags" data-type="text">Tags</option>
-							<option value="duration" data-type="number">Duration</option>
-							<option value="published_date" data-type="date">Published Date</option>
-							<option value="video_category" data-type="text">Video Category</option>
-							<option value="view_count" data-type="number">View Count</option>
-							<option value="like_count" data-type="number">Like Count</option>
-							<option value="comment_count" data-type="number">Comment Count</option>
-						</optgroup>
-					</select>
-				</div>
-				<div class="ys-form-group">
-					<label for="ys-condition-operator-<?php echo $index; ?>">Comparison Operator</label>
-					<select class="ys-select ys-condition-operator" id="ys-condition-operator-<?php echo $index; ?>" name="sync_rules[<?php echo $index; ?>][condition_operator]">
-						<option value="">Select operator</option>
-						<optgroup data-type="text" label="Text Operators">
-							<option value="contains">Contains</option>
-							<option value="not_contains">Does not contain</option>
-							<option value="equals">Matches</option>
-							<option value="not_equals">Does not match</option>
-							<option value="starts_with">Starts with</option>
-							<option value="ends_with">Ends with</option>
-						</optgroup>
-						<optgroup data-type="number" label="Number Operators">
-							<option value="greater_than">Greater than</option>
-							<option value="less_than">Less than</option>
-							<option value="equal_to">Equal to</option>
-							<option value="between">Between</option>
-						</optgroup>
-						<optgroup data-type="date" label="Date Operators">
-							<option value="before">Before</option>
-							<option value="after">After</option>
-							<option value="within">Within (last X days)</option>
-							<option value="between_dates">Between (date range)</option>
-						</optgroup>
-					</select>
-				</div>
-				<div class="ys-form-group">
-					<label for="ys-condition-value-<?php echo $index; ?>">Value</label>
-					<input class="ys-text ys-condition-value" id="ys-condition-value-<?php echo $index; ?>" name="sync_rules[<?php echo $index; ?>][condition_value]" type="text" placeholder="Enter value...">
-				</div>
+		<fieldset class="ys-fieldset ys-conditions-wrapper">
+			<legend class="ys-mt-4"><strong>Conditions</strong> &mdash; <a class="ys-add-condition" href="#">Add condition</a></legend>
+			<p class="description ys-mb-3">Add conditions to filter which videos are synced. Videos must match <strong>all</strong> conditions (AND logic). <br> To sync videos matching <strong>any</strong> condition (OR logic), create multiple sync rules.</p>
+			<div class="ys-conditions" data-rule-index="<?php echo $rule_index; ?>">
+				<?php
+				if ( ! empty( $conditions ) && is_array( $conditions ) ) {
+					foreach ( $conditions as $condition_index => $condition ) {
+						yousync_get_template_part( 'sync-rule', 'condition', array(
+							'rule_index'      => $rule_index,
+							'condition_index' => $condition_index,
+							'condition'       => $condition,
+						) );
+					}
+				}
+				?>
 			</div>
 		</fieldset>
 
