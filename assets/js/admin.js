@@ -21,7 +21,12 @@ function reindexRules() {
 		rule.querySelectorAll('[id]').forEach(element => {
 			const id = element.getAttribute('id')
 			if (id.includes(oldIndex)) {
-				element.setAttribute('id', id.replace(new RegExp(oldIndex, 'g'), newIndex))
+				// Replace rule index only at the end (rule-level IDs like ys-action-1)
+				// or right after "sync-rules-" (condition IDs like sync-rules-1-conditions-0-field).
+				// Avoids corrupting condition indices when rule and condition share the same digit.
+				let newId = id.replace(new RegExp(`-${oldIndex}$`), `-${newIndex}`)
+				newId = newId.replace(`sync-rules-${oldIndex}-`, `sync-rules-${newIndex}-`)
+				element.setAttribute('id', newId)
 			}
 		})
 
@@ -29,7 +34,9 @@ function reindexRules() {
 		rule.querySelectorAll('[for]').forEach(element => {
 			const forAttr = element.getAttribute('for')
 			if (forAttr.includes(oldIndex)) {
-				element.setAttribute('for', forAttr.replace(new RegExp(oldIndex, 'g'), newIndex))
+				let newFor = forAttr.replace(new RegExp(`-${oldIndex}$`), `-${newIndex}`)
+				newFor = newFor.replace(`sync-rules-${oldIndex}-`, `sync-rules-${newIndex}-`)
+				element.setAttribute('for', newFor)
 			}
 		})
 
@@ -112,8 +119,8 @@ syncRules.addEventListener('change', function(e) {
 
 	if (e.target.classList.contains('ys-action')) {
 		const syncRule	= e.target.closest('.ys-sync-rule')
-		const formGroup	= syncRule.querySelector('.ys-specific-metadata-wrapper')
-		const select		= syncRule.querySelector('.ys-specific-metadata')
+		const formGroup	= syncRule.querySelector('.ys-specific-metadata-wrapper') || syncRule.querySelector('.ys-action-metadata-wrapper')
+		const select		= syncRule.querySelector('.ys-specific-metadata') || syncRule.querySelector('.ys-action-metadata')
 		const value			= e.target.value
 		const selected	= e.target.selectedOptions[0]
 		const resource	= selected.dataset.resource
@@ -182,7 +189,7 @@ syncRules.addEventListener('change', function(e) {
 		 * But switching from "Sync new videos" to "Update all videos" (same resource) preserves conditions
 		 * This prevents users from losing their work when toggling between actions of the same resource
 		 */
-		if (selectedResource != conditions.dataset.resource) {
+		if (conditions && selectedResource != conditions.dataset.resource) {
 			const conditionGroups	= syncRule.querySelectorAll('.ys-condition')
 			const conditionField = syncRule.querySelector('.ys-condition-field')
 			const operatorField = syncRule.querySelector('.ys-condition-operator')
