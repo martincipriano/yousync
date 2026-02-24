@@ -57,4 +57,5 @@ if ( ! defined( 'ABSPATH' ) ) {
 			</div>
 		<?php } ?>
 	</fieldset>
+	<p class="description"><?php esc_html_e( 'Make sure the slug does not conflict with an existing page or post, otherwise the archive may not be accessible.', 'yousync' ); ?></p>
 </div>
