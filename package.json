@@ -1,0 +1,19 @@
+{
+  "name": "yousync",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:channels": "playwright test tests/e2e/channels.spec.js",
+    "test:playlists": "playwright test tests/e2e/playlists.spec.js",
+    "test:settings": "playwright test tests/e2e/settings.spec.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "dotenv": "^17.3.1"
+  }
+}
