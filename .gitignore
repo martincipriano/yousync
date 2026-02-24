@@ -17,6 +17,11 @@ $RECYCLE.BIN/
 # Node modules
 node_modules/
 
+# Playwright
+tests/e2e/.auth/
+playwright-report/
+test-results/
+
 # Temporary files
 *.tmp
 *.temp
