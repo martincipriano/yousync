@@ -181,13 +181,16 @@ class Channel {
 			],
 			'syncRule' => [
 				'channel' => [
-					'fieldOptions' => yousync_return_template_part('options', 'channel-fields')
+					'fieldOptions'    => yousync_return_template_part('options', 'channel-fields'),
+					'metadataOptions' => yousync_return_template_part('options', 'channel-metadata'),
 				],
 				'video' => [
-					'fieldOptions' => yousync_return_template_part('options', 'video-fields')
+					'fieldOptions'    => yousync_return_template_part('options', 'video-fields'),
+					'metadataOptions' => yousync_return_template_part('options', 'video-metadata'),
 				],
 				'playlist' => [
-					'fieldOptions' => yousync_return_template_part('options', 'playlist-fields')
+					'fieldOptions'    => yousync_return_template_part('options', 'playlist-fields'),
+					'metadataOptions' => yousync_return_template_part('options', 'playlist-metadata'),
 				],
 				'condition' => yousync_return_template_part('sync-rule', 'condition'),
 				'rule' => yousync_return_template_part('sync-rule')
