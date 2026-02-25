@@ -1,0 +1,11 @@
+<option disabled selected value="">&mdash; Select field &mdash;</option>
+<option value="title">Title</option>
+<option value="description">Description</option>
+<option value="thumbnail">Thumbnail</option>
+<option value="tags">Tags</option>
+<option value="video_category">Video Category</option>
+<option value="duration">Duration</option>
+<option value="published_date">Published Date</option>
+<option value="view_count">View Count</option>
+<option value="like_count">Like Count</option>
+<option value="comment_count">Comment Count</option>
