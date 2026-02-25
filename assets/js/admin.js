@@ -137,7 +137,7 @@ syncRules.addEventListener('change', function(e) {
 				tomselect.clearOptions()
 
 				// Display resource specific options
-				select.innerHTML = youSync.syncRule[resource].fieldOptions
+				select.innerHTML = youSync.syncRule[resource].metadataOptions
 				select.querySelectorAll('option').forEach(option => {
 
 					// Skip disabled options
@@ -154,7 +154,7 @@ syncRules.addEventListener('change', function(e) {
 			} else {
 
 				// Tom Select hasn't been initialized yet
-				select.innerHTML = youSync.syncRule[resource].fieldOptions
+				select.innerHTML = youSync.syncRule[resource].metadataOptions
 
 				// Initialize Tom Select
 				new TomSelect(select, {
