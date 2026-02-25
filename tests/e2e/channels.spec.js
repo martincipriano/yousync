@@ -220,6 +220,76 @@ test.describe('Sync Rule – Action dropdown', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Sync Rules – Specific Metadata options
+// ---------------------------------------------------------------------------
+
+test.describe('Sync Rule – Specific Metadata options', () => {
+  test.beforeEach(async ({ page }) => {
+    await goToChannels(page);
+    await page.locator('#ys-add-rule').click();
+  });
+
+  test('channel_update_specific shows profile_picture and banner_image options', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('channel_update_specific');
+
+    const select = rule.locator('.ys-specific-metadata');
+    await expect(select.locator('option[value="profile_picture"]')).toBeAttached();
+    await expect(select.locator('option[value="banner_image"]')).toBeAttached();
+  });
+
+  test('channel_update_specific does not show a generic thumbnail option', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('channel_update_specific');
+
+    const select = rule.locator('.ys-specific-metadata');
+    await expect(select.locator('option[value="thumbnail"]')).not.toBeAttached();
+  });
+
+  test('channel_update_specific shows channel title and description options', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('channel_update_specific');
+
+    const select = rule.locator('.ys-specific-metadata');
+    await expect(select.locator('option[value="channel_title"]')).toBeAttached();
+    await expect(select.locator('option[value="channel_description"]')).toBeAttached();
+    await expect(select.locator('option[value="subscriber_count"]')).toBeAttached();
+    await expect(select.locator('option[value="video_count"]')).toBeAttached();
+  });
+
+  test('videos_update_specific_all shows thumbnail option for videos', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('videos_update_specific_all');
+
+    const select = rule.locator('.ys-specific-metadata');
+    await expect(select.locator('option[value="thumbnail"]')).toBeAttached();
+  });
+
+  test('videos_update_specific_all shows all expected video metadata options', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('videos_update_specific_all');
+
+    const select = rule.locator('.ys-specific-metadata');
+    await expect(select.locator('option[value="title"]')).toBeAttached();
+    await expect(select.locator('option[value="description"]')).toBeAttached();
+    await expect(select.locator('option[value="thumbnail"]')).toBeAttached();
+    await expect(select.locator('option[value="tags"]')).toBeAttached();
+    await expect(select.locator('option[value="view_count"]')).toBeAttached();
+    await expect(select.locator('option[value="like_count"]')).toBeAttached();
+    await expect(select.locator('option[value="comment_count"]')).toBeAttached();
+  });
+
+  test('thumbnail does not appear in condition field options for video actions', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('videos_sync_new');
+    await rule.locator('.ys-add-condition').click();
+
+    const condition = rule.locator('.ys-condition').last();
+    await expect(condition.locator('.ys-condition-field option[value="thumbnail"]')).not.toBeAttached();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Sync Rules – Conditions
 // ---------------------------------------------------------------------------
 

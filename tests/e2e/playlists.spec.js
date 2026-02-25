@@ -196,6 +196,76 @@ test.describe('Playlist Sync Rule – Action', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Sync Rules – Specific Metadata options (playlist)
+// ---------------------------------------------------------------------------
+
+test.describe('Playlist Sync Rule – Specific Metadata options', () => {
+  test.beforeEach(async ({ page }) => {
+    await goToPlaylists(page);
+    await page.locator('#ys-add-rule').click();
+  });
+
+  test('playlist_update_specific shows playlist_thumbnail option', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('playlist_update_specific');
+
+    const select = rule.locator('.ys-specific-metadata');
+    await expect(select.locator('option[value="playlist_thumbnail"]')).toBeAttached();
+  });
+
+  test('playlist_update_specific shows all expected playlist metadata options', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('playlist_update_specific');
+
+    const select = rule.locator('.ys-specific-metadata');
+    await expect(select.locator('option[value="playlist_title"]')).toBeAttached();
+    await expect(select.locator('option[value="playlist_description"]')).toBeAttached();
+    await expect(select.locator('option[value="playlist_thumbnail"]')).toBeAttached();
+    await expect(select.locator('option[value="playlist_video_count"]')).toBeAttached();
+  });
+
+  test('videos_update_specific_all shows thumbnail option for videos', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('videos_update_specific_all');
+
+    const select = rule.locator('.ys-specific-metadata');
+    await expect(select.locator('option[value="thumbnail"]')).toBeAttached();
+  });
+
+  test('videos_update_specific_all shows all expected video metadata options', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('videos_update_specific_all');
+
+    const select = rule.locator('.ys-specific-metadata');
+    await expect(select.locator('option[value="title"]')).toBeAttached();
+    await expect(select.locator('option[value="description"]')).toBeAttached();
+    await expect(select.locator('option[value="thumbnail"]')).toBeAttached();
+    await expect(select.locator('option[value="tags"]')).toBeAttached();
+    await expect(select.locator('option[value="view_count"]')).toBeAttached();
+    await expect(select.locator('option[value="like_count"]')).toBeAttached();
+    await expect(select.locator('option[value="comment_count"]')).toBeAttached();
+  });
+
+  test('playlist_thumbnail does not appear in condition field options', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('videos_sync_new');
+    await rule.locator('.ys-add-condition').click();
+
+    const condition = rule.locator('.ys-condition').last();
+    await expect(condition.locator('.ys-condition-field option[value="playlist_thumbnail"]')).not.toBeAttached();
+  });
+
+  test('thumbnail does not appear in condition field options for video actions', async ({ page }) => {
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('videos_sync_new');
+    await rule.locator('.ys-add-condition').click();
+
+    const condition = rule.locator('.ys-condition').last();
+    await expect(condition.locator('.ys-condition-field option[value="thumbnail"]')).not.toBeAttached();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Sync Rules – Conditions (playlist)
 //
 // Playlist sync rules use the same dynamic condition system as channels:
