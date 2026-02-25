@@ -179,10 +179,12 @@ class Playlist {
 			),
 			'syncRule' => array(
 				'playlist' => array(
-					'fieldOptions' => yousync_return_template_part('options', 'playlist-fields'),
+					'fieldOptions'    => yousync_return_template_part('options', 'playlist-fields'),
+					'metadataOptions' => yousync_return_template_part('options', 'playlist-metadata'),
 				),
 				'video' => array(
-					'fieldOptions' => yousync_return_template_part('options', 'video-fields'),
+					'fieldOptions'    => yousync_return_template_part('options', 'video-fields'),
+					'metadataOptions' => yousync_return_template_part('options', 'video-metadata'),
 				),
 				'condition' => yousync_return_template_part('sync-rule', 'condition'),
 				'rule'      => yousync_return_template_part('sync-rule-playlist'),
