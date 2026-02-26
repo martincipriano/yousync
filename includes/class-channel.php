@@ -305,7 +305,7 @@ class Channel {
 		// Update sync rules (re-index to ensure sequential keys).
 		if ( isset( $_POST['sync_rules'] ) && is_array( $_POST['sync_rules'] ) ) {
 			$data['sync_rules'] = array_values( array_map( array( $this, 'sanitize_sync_rule' ), $_POST['sync_rules'] ) );
-		} elseif ( ! isset( $data['sync_rules'] ) ) {
+		} else {
 			$data['sync_rules'] = array();
 		}
 
