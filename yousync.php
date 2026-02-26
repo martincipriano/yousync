@@ -200,22 +200,26 @@ function yousync_render_video_metabox( $post ) {
 	}
 
 	// Editable fields
-	$video_id  = isset( $data['video_id'] ) ? $data['video_id'] : '';
-	$video_url = isset( $data['video_url'] ) ? $data['video_url'] : '';
+	$video_id     = isset( $data['video_id'] ) ? $data['video_id'] : '';
+	$video_url    = isset( $data['video_url'] ) ? $data['video_url'] : '';
+	$channel_id   = isset( $data['channel_id'] ) ? $data['channel_id'] : '';
+	$manual_edits = isset( $data['manual_edits'] ) ? (bool) $data['manual_edits'] : false;
 
 	// Read-only YouTube data
-	$original_title   = isset( $data['original_title'] ) ? $data['original_title'] : '';
-	$channel_title    = isset( $data['channel_title'] ) ? $data['channel_title'] : '';
-	$published_date   = isset( $data['published_date'] ) ? $data['published_date'] : '';
-	$duration_seconds = isset( $data['duration_seconds'] ) ? $data['duration_seconds'] : '';
-	$view_count       = isset( $data['view_count'] ) ? $data['view_count'] : '';
-	$like_count       = isset( $data['like_count'] ) ? $data['like_count'] : '';
-	$comment_count    = isset( $data['comment_count'] ) ? $data['comment_count'] : '';
-	$sync_source_type = isset( $data['sync_source_type'] ) ? $data['sync_source_type'] : '';
-	$last_synced      = isset( $data['last_synced'] ) ? $data['last_synced'] : '';
-	$sync_count       = isset( $data['sync_count'] ) ? $data['sync_count'] : 0;
-	$manual_edits     = isset( $data['manual_edits'] ) ? $data['manual_edits'] : false;
+	$original_title       = isset( $data['original_title'] ) ? $data['original_title'] : '';
+	$original_description = isset( $data['original_description'] ) ? $data['original_description'] : '';
+	$channel_title        = isset( $data['channel_title'] ) ? $data['channel_title'] : '';
+	$published_date       = isset( $data['published_date'] ) ? $data['published_date'] : '';
+	$duration_seconds     = isset( $data['duration_seconds'] ) ? $data['duration_seconds'] : '';
+	$view_count           = isset( $data['view_count'] ) ? $data['view_count'] : '';
+	$like_count           = isset( $data['like_count'] ) ? $data['like_count'] : '';
+	$comment_count        = isset( $data['comment_count'] ) ? $data['comment_count'] : '';
+	$sync_source_type     = isset( $data['sync_source_type'] ) ? $data['sync_source_type'] : '';
+	$last_synced          = isset( $data['last_synced'] ) ? $data['last_synced'] : '';
+	$sync_count           = isset( $data['sync_count'] ) ? $data['sync_count'] : 0;
+	$sync_errors          = isset( $data['sync_errors'] ) && is_array( $data['sync_errors'] ) ? $data['sync_errors'] : array();
 	?>
+
 	<table class="form-table">
 		<tr>
 			<th scope="row">
@@ -232,13 +236,52 @@ function yousync_render_video_metabox( $post ) {
 			</th>
 			<td>
 				<input type="url" name="yousync_video_url" id="yousync_video_url" value="<?php echo esc_attr( $video_url ); ?>" class="regular-text">
+				<p class="description"><?php esc_html_e( 'Full YouTube URL (e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ)', 'yousync' ); ?></p>
 			</td>
 		</tr>
+		<tr>
+			<th scope="row">
+				<label for="yousync_channel_id"><?php esc_html_e( 'Channel ID', 'yousync' ); ?></label>
+			</th>
+			<td>
+				<input type="text" name="yousync_channel_id" id="yousync_channel_id" value="<?php echo esc_attr( $channel_id ); ?>" class="regular-text">
+				<p class="description"><?php esc_html_e( 'YouTube channel ID (e.g., UCuAXFkgsw1L7xaCfnd5JJOw)', 'yousync' ); ?></p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row">
+				<label for="yousync_manual_edits"><?php esc_html_e( 'Protect from Sync', 'yousync' ); ?></label>
+			</th>
+			<td>
+				<label>
+					<input type="checkbox" name="yousync_manual_edits" id="yousync_manual_edits" value="1" <?php checked( $manual_edits ); ?>>
+					<?php esc_html_e( 'Prevent sync from overwriting the title and description', 'yousync' ); ?>
+				</label>
+			</td>
+		</tr>
+	</table>
 
+	<?php
+	$has_yt_data = $original_title || $original_description || $channel_title || $published_date
+		|| $duration_seconds !== '' || $view_count !== '' || $like_count !== '' || $comment_count !== '';
+	if ( $has_yt_data ) :
+	?>
+	<hr>
+	<h4 style="margin:12px 0 4px;"><?php esc_html_e( 'YouTube Data', 'yousync' ); ?></h4>
+	<table class="form-table">
 		<?php if ( $original_title ) : ?>
 		<tr>
 			<th scope="row"><?php esc_html_e( 'Original Title', 'yousync' ); ?></th>
 			<td><?php echo esc_html( $original_title ); ?></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $original_description ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Original Description', 'yousync' ); ?></th>
+			<td>
+				<p style="margin:0; white-space:pre-wrap; max-height:7em; overflow-y:auto;"><?php echo esc_html( $original_description ); ?></p>
+			</td>
 		</tr>
 		<?php endif; ?>
 
@@ -293,7 +336,13 @@ function yousync_render_video_metabox( $post ) {
 			<td><?php echo esc_html( number_format( (int) $comment_count ) ); ?></td>
 		</tr>
 		<?php endif; ?>
+	</table>
+	<?php endif; ?>
 
+	<?php if ( $sync_source_type || $last_synced || $sync_count || ! empty( $sync_errors ) ) : ?>
+	<hr>
+	<h4 style="margin:12px 0 4px;"><?php esc_html_e( 'Sync Status', 'yousync' ); ?></h4>
+	<table class="form-table">
 		<?php if ( $sync_source_type ) : ?>
 		<tr>
 			<th scope="row"><?php esc_html_e( 'Sync Source', 'yousync' ); ?></th>
@@ -315,21 +364,36 @@ function yousync_render_video_metabox( $post ) {
 		</tr>
 		<?php endif; ?>
 
-		<?php if ( $manual_edits ) : ?>
+		<?php if ( ! empty( $sync_errors ) ) : ?>
 		<tr>
-			<th scope="row"><?php esc_html_e( 'Manual Edits', 'yousync' ); ?></th>
-			<td><?php esc_html_e( 'Yes — title or description has been edited since last sync', 'yousync' ); ?></td>
+			<th scope="row"><?php esc_html_e( 'Sync Errors', 'yousync' ); ?></th>
+			<td>
+				<?php foreach ( $sync_errors as $sync_error ) : ?>
+				<p style="margin:0 0 4px;color:#d63638;">
+					<?php
+					if ( ! empty( $sync_error['timestamp'] ) ) {
+						echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $sync_error['timestamp'] ) ) . ' &mdash; ';
+					}
+					echo esc_html( isset( $sync_error['error'] ) ? $sync_error['error'] : '' );
+					if ( ! empty( $sync_error['code'] ) ) {
+						echo ' <code>' . esc_html( $sync_error['code'] ) . '</code>';
+					}
+					?>
+				</p>
+				<?php endforeach; ?>
+			</td>
 		</tr>
 		<?php endif; ?>
 	</table>
+	<?php endif; ?>
 	<?php
 }
 
 /**
  * Save video metabox data.
  *
- * Merges editable fields (video_id, video_url) into the existing JSON meta,
- * preserving all YouTube API data that was previously synced.
+ * Merges editable fields (video_id, video_url, channel_id, manual_edits) into
+ * the existing JSON meta, preserving all YouTube API data previously synced.
  *
  * @param int $post_id The current post ID.
  * @return void
@@ -362,6 +426,10 @@ function yousync_save_video_meta( $post_id ) {
 	if ( isset( $_POST['yousync_video_url'] ) ) {
 		$data['video_url'] = esc_url_raw( wp_unslash( $_POST['yousync_video_url'] ) );
 	}
+	if ( isset( $_POST['yousync_channel_id'] ) ) {
+		$data['channel_id'] = sanitize_text_field( wp_unslash( $_POST['yousync_channel_id'] ) );
+	}
+	$data['manual_edits'] = isset( $_POST['yousync_manual_edits'] ) && '1' === $_POST['yousync_manual_edits'];
 
 	update_post_meta( $post_id, '_yousync_video', wp_json_encode( $data ) );
 }
