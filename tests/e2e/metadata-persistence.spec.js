@@ -209,6 +209,67 @@ test.describe('Channel – sync rule persistence', () => {
 
     await expect(page.locator('.ys-sync-rule')).toHaveCount(2);
   });
+
+  test('removing the only sync rule clears it from metadata after save', async ({ page }) => {
+    const id = uniqueId();
+    await goToChannels(page);
+
+    await page.locator('input[name="tag-name"]').fill(`Remove Last Channel ${id}`);
+    await page.locator('input[name="channel_id"]').fill(`UC${id}`);
+    await page.locator('#ys-add-rule').click();
+    await page.locator('.ys-sync-rule').last().locator('.ys-action').selectOption('videos_sync_new');
+
+    await page.locator('#submit').click();
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('#the-list tr').filter({ hasText: `Remove Last Channel ${id}` }).locator('a.row-title').click();
+    await page.waitForLoadState('networkidle');
+
+    // Remove the only rule and wait for the 300 ms removal animation
+    await page.locator('.ys-sync-rule').first().locator('.ys-remove-rule').click();
+    await page.waitForTimeout(400);
+
+    await page.locator('#submit').click();
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('#the-list tr').filter({ hasText: `Remove Last Channel ${id}` }).locator('a.row-title').click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.ys-sync-rule')).toHaveCount(0);
+  });
+
+  test('removing one of multiple sync rules removes only that rule after save', async ({ page }) => {
+    const id = uniqueId();
+    await goToChannels(page);
+
+    await page.locator('input[name="tag-name"]').fill(`Remove One Rule Channel ${id}`);
+    await page.locator('input[name="channel_id"]').fill(`UC${id}`);
+
+    await page.locator('#ys-add-rule').click();
+    await page.locator('.ys-sync-rule').nth(0).locator('.ys-action').selectOption('videos_sync_new');
+
+    await page.locator('#ys-add-rule').click();
+    await page.locator('.ys-sync-rule').nth(1).locator('.ys-action').selectOption('channel_update_all');
+
+    await page.locator('#submit').click();
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('#the-list tr').filter({ hasText: `Remove One Rule Channel ${id}` }).locator('a.row-title').click();
+    await page.waitForLoadState('networkidle');
+
+    // Remove the first rule
+    await page.locator('.ys-sync-rule').first().locator('.ys-remove-rule').click();
+    await page.waitForTimeout(400);
+
+    await page.locator('#submit').click();
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('#the-list tr').filter({ hasText: `Remove One Rule Channel ${id}` }).locator('a.row-title').click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.ys-sync-rule')).toHaveCount(1);
+    await expect(page.locator('.ys-sync-rule').first().locator('.ys-action')).toHaveValue('channel_update_all');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -545,6 +606,33 @@ test.describe('Playlist – sync rule persistence', () => {
     await expect(saved.locator('.ys-condition-field')).toHaveValue('view_count');
     await expect(saved.locator('.ys-condition-operator')).toHaveValue('greater_than');
     await expect(saved.locator('.ys-condition-value')).toHaveValue('500');
+  });
+
+  test('removing the only sync rule clears it from playlist metadata after save', async ({ page }) => {
+    const id = uniqueId();
+    await goToPlaylists(page);
+
+    await page.locator('input[name="tag-name"]').fill(`Remove Last Playlist ${id}`);
+    await page.locator('input[name="playlist_id"]').fill(`PL${id}`);
+    await page.locator('#ys-add-rule').click();
+    await page.locator('.ys-sync-rule').last().locator('.ys-action').selectOption('videos_sync_new');
+
+    await page.locator('#submit').click();
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('#the-list tr').filter({ hasText: `Remove Last Playlist ${id}` }).locator('a.row-title').click();
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('.ys-sync-rule').first().locator('.ys-remove-rule').click();
+    await page.waitForTimeout(400);
+
+    await page.locator('#submit').click();
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('#the-list tr').filter({ hasText: `Remove Last Playlist ${id}` }).locator('a.row-title').click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.ys-sync-rule')).toHaveCount(0);
   });
 
   test('playlist specific metadata persists as a TomSelect item on the edit page', async ({ page }) => {
