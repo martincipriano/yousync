@@ -101,9 +101,22 @@ class Playlist {
 	 * @return void
 	 */
 	public function edit_playlist_fields( $term, $taxonomy ) {
-		$playlist_id = get_term_meta( $term->term_id, 'playlist_id', true );
-		$sync_rules = get_term_meta( $term->term_id, 'sync_rules', true );
+		$meta = get_term_meta( $term->term_id, 'yousync_playlist', true );
+		$data = $meta ? json_decode( $meta, true ) : array();
+		if ( ! is_array( $data ) ) {
+			$data = array();
+		}
+
+		$playlist_id          = isset( $data['playlist_id'] ) ? $data['playlist_id'] : '';
+		$sync_rules           = isset( $data['sync_rules'] ) ? $data['sync_rules'] : array();
+		$playlist_title       = isset( $data['playlist_title'] ) ? $data['playlist_title'] : '';
+		$playlist_description = isset( $data['playlist_description'] ) ? $data['playlist_description'] : '';
+		$playlist_video_count = isset( $data['playlist_video_count'] ) ? $data['playlist_video_count'] : '';
+		$playlist_thumbnail   = isset( $data['playlist_thumbnail'] ) ? $data['playlist_thumbnail'] : array();
+		$last_synced          = isset( $data['last_synced'] ) ? $data['last_synced'] : '';
+		$sync_count           = isset( $data['sync_count'] ) ? $data['sync_count'] : 0;
 		?>
+
 		<tr class="form-field term-playlist-id-wrap">
 			<th scope="row">
 				<label for="playlist-id"><?php esc_html_e( 'Playlist ID', 'yousync' ); ?></label>
@@ -115,6 +128,54 @@ class Playlist {
 				</p>
 			</td>
 		</tr>
+
+		<?php if ( $playlist_title ) : ?>
+		<tr class="form-field">
+			<th scope="row"><?php esc_html_e( 'Playlist Title', 'yousync' ); ?></th>
+			<td><p><?php echo esc_html( $playlist_title ); ?></p></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $playlist_description ) : ?>
+		<tr class="form-field">
+			<th scope="row"><?php esc_html_e( 'Description', 'yousync' ); ?></th>
+			<td><p><?php echo esc_html( $playlist_description ); ?></p></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( ! empty( $playlist_thumbnail ) ) : ?>
+		<tr class="form-field">
+			<th scope="row"><?php esc_html_e( 'Thumbnail', 'yousync' ); ?></th>
+			<td>
+				<?php if ( ! empty( $playlist_thumbnail['attachment_id'] ) ) : ?>
+					<?php echo wp_get_attachment_image( (int) $playlist_thumbnail['attachment_id'], array( 120, 90 ) ); ?>
+				<?php elseif ( ! empty( $playlist_thumbnail['url'] ) ) : ?>
+					<img src="<?php echo esc_url( $playlist_thumbnail['url'] ); ?>" style="max-width:160px;height:auto;" alt="">
+				<?php endif; ?>
+			</td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $playlist_video_count !== '' ) : ?>
+		<tr class="form-field">
+			<th scope="row"><?php esc_html_e( 'Videos', 'yousync' ); ?></th>
+			<td><p><?php echo esc_html( number_format( (int) $playlist_video_count ) ); ?></p></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $last_synced ) : ?>
+		<tr class="form-field">
+			<th scope="row"><?php esc_html_e( 'Last Synced', 'yousync' ); ?></th>
+			<td><p><?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $last_synced ) ); ?></p></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $sync_count ) : ?>
+		<tr class="form-field">
+			<th scope="row"><?php esc_html_e( 'Sync Count', 'yousync' ); ?></th>
+			<td><p><?php echo esc_html( $sync_count ); ?></p></td>
+		</tr>
+		<?php endif; ?>
 
 		<tr class="form-field term-sync-rules-wrap">
 			<th scope="row">
@@ -136,10 +197,9 @@ class Playlist {
 	private function render_sync_rules_section( $sync_rules = array() ) {
 		$html = '';
 		foreach ( $sync_rules as $index => $rule ) {
-			$html .= yousync_return_template_part( 'sync-rule', 'playlist', array(
-				'playlist_obj' => $this,
-				'index'        => $index,
-				'rule'         => $rule,
+			$html .= yousync_return_template_part( 'sync-rule-playlist', null, array(
+				'index' => $index,
+				'rule'  => $rule,
 			) );
 		} ?>
 		<p class="ys-mb-3 ys-mt-4"><strong>Sync Rules</strong> &mdash; <a class="ys-add-rule" href="#" id="ys-add-rule"><?php esc_html_e( 'Add sync rule', 'yousync' ); ?></a></p>
@@ -160,74 +220,87 @@ class Playlist {
 			return;
 		}
 
-		wp_enqueue_style('tom-select', 'https://cdnjs.cloudflare.com/ajax/libs/tom-select/2.4.3/css/tom-select.min.css', array(), '2.4.3');
-		wp_enqueue_style('yousync-admin', YOUSYNC_PLUGIN_URL . 'assets/css/admin.css', array( 'tom-select' ), filemtime(YOUSYNC_PLUGIN_DIR . 'assets/css/admin.css'));
+		wp_enqueue_style( 'tom-select', 'https://cdnjs.cloudflare.com/ajax/libs/tom-select/2.4.3/css/tom-select.min.css', array(), '2.4.3' );
+		wp_enqueue_style( 'yousync-admin', YOUSYNC_PLUGIN_URL . 'assets/css/admin.css', array( 'tom-select' ), filemtime( YOUSYNC_PLUGIN_DIR . 'assets/css/admin.css' ) );
 
-		wp_enqueue_script('tom-select', 'https://cdnjs.cloudflare.com/ajax/libs/tom-select/2.4.3/js/tom-select.complete.min.js', array(), '2.4.3', true);
-		wp_enqueue_script('yousync-admin', YOUSYNC_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery', 'tom-select' ), filemtime(YOUSYNC_PLUGIN_DIR . 'assets/js/admin.js'), true);
+		wp_enqueue_script( 'tom-select', 'https://cdnjs.cloudflare.com/ajax/libs/tom-select/2.4.3/js/tom-select.complete.min.js', array(), '2.4.3', true );
+		wp_enqueue_script( 'yousync-admin', YOUSYNC_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery', 'tom-select' ), filemtime( YOUSYNC_PLUGIN_DIR . 'assets/js/admin.js' ), true );
 
-		wp_localize_script('yousync-admin', 'youSync', array(
+		wp_localize_script( 'yousync-admin', 'youSync', array(
 			'operators' => array(
-				'text'   => yousync_return_template_part('options', 'text-operators', array('operator' => '')),
-				'number' => yousync_return_template_part('options', 'number-operators', array('operator' => '')),
-				'date'   => yousync_return_template_part('options', 'date-operators', array('operator' => '')),
+				'text'   => yousync_return_template_part( 'options', 'text-operators', array( 'operator' => '' ) ),
+				'number' => yousync_return_template_part( 'options', 'number-operators', array( 'operator' => '' ) ),
+				'date'   => yousync_return_template_part( 'options', 'date-operators', array( 'operator' => '' ) ),
 			),
 			'values'   => array(
-				'text'   => yousync_return_template_part('input', 'text'),
-				'number' => yousync_return_template_part('input', 'number'),
-				'date'   => yousync_return_template_part('input', 'date'),
+				'text'   => yousync_return_template_part( 'input', 'text' ),
+				'number' => yousync_return_template_part( 'input', 'number' ),
+				'date'   => yousync_return_template_part( 'input', 'date' ),
 			),
 			'syncRule' => array(
 				'playlist' => array(
-					'fieldOptions'    => yousync_return_template_part('options', 'playlist-fields'),
-					'metadataOptions' => yousync_return_template_part('options', 'playlist-metadata'),
+					'fieldOptions'    => yousync_return_template_part( 'options', 'playlist-fields' ),
+					'metadataOptions' => yousync_return_template_part( 'options', 'playlist-metadata' ),
 				),
 				'video' => array(
-					'fieldOptions'    => yousync_return_template_part('options', 'video-fields'),
-					'metadataOptions' => yousync_return_template_part('options', 'video-metadata'),
+					'fieldOptions'    => yousync_return_template_part( 'options', 'video-fields' ),
+					'metadataOptions' => yousync_return_template_part( 'options', 'video-metadata' ),
 				),
-				'condition' => yousync_return_template_part('sync-rule', 'condition'),
-				'rule'      => yousync_return_template_part('sync-rule-playlist'),
+				'condition' => yousync_return_template_part( 'sync-rule', 'condition' ),
+				'rule'      => yousync_return_template_part( 'sync-rule-playlist' ),
 			),
-		));
+		) );
 	}
 
 	/**
 	 * Save playlist meta.
+	 *
+	 * Merges user-editable fields (playlist_id, sync_rules) into the existing JSON
+	 * meta, preserving any YouTube API data that was previously synced.
 	 *
 	 * @param int $term_id Term ID.
 	 * @param int $tt_id Term taxonomy ID.
 	 * @return void
 	 */
 	public function save_playlist_meta( $term_id, $tt_id ) {
-		// Save playlist ID.
-		if ( isset( $_POST['playlist_id'] ) ) {
-			update_term_meta( $term_id, 'playlist_id', sanitize_text_field( wp_unslash( $_POST['playlist_id'] ) ) );
+		// Read existing JSON meta to preserve YouTube API data.
+		$existing_meta = get_term_meta( $term_id, 'yousync_playlist', true );
+		$data          = $existing_meta ? json_decode( $existing_meta, true ) : array();
+		if ( ! is_array( $data ) ) {
+			$data = array();
 		}
 
-		// Save sync rules.
-		if ( isset( $_POST['sync_rules'] ) && is_array( $_POST['sync_rules'] ) ) {
-			$sync_rules = array_map( array( $this, 'sanitize_sync_rule' ), $_POST['sync_rules'] );
-			update_term_meta( $term_id, 'sync_rules', $sync_rules );
+		// Update editable fields.
+		if ( isset( $_POST['playlist_id'] ) ) {
+			$data['playlist_id'] = sanitize_text_field( wp_unslash( $_POST['playlist_id'] ) );
 		}
+
+		// Update sync rules (re-index to ensure sequential keys).
+		if ( isset( $_POST['sync_rules'] ) && is_array( $_POST['sync_rules'] ) ) {
+			$data['sync_rules'] = array_values( array_map( array( $this, 'sanitize_sync_rule' ), $_POST['sync_rules'] ) );
+		} elseif ( ! isset( $data['sync_rules'] ) ) {
+			$data['sync_rules'] = array();
+		}
+
+		update_term_meta( $term_id, 'yousync_playlist', wp_json_encode( $data ) );
 	}
 
 	/**
-	 * Sanitize sync rule.
+	 * Sanitize a single sync rule.
 	 *
-	 * @param array $rule Rule data.
+	 * @param array $rule Raw rule data from $_POST.
 	 * @return array Sanitized rule.
 	 */
 	private function sanitize_sync_rule( $rule ) {
 		$sanitized = array(
-			'enabled'          => isset( $rule['enabled'] ) ? (bool) $rule['enabled'] : false,
-			'schedule'         => isset( $rule['schedule'] ) ? sanitize_text_field( $rule['schedule'] ) : 'daily',
-			'custom_schedule'  => isset( $rule['custom_schedule'] ) ? absint( $rule['custom_schedule'] ) : 24,
-			'action'           => isset( $rule['action'] ) ? sanitize_text_field( $rule['action'] ) : '',
-			'specific_metadata'=> isset( $rule['specific_metadata'] ) && is_array( $rule['specific_metadata'] )
+			'enabled'           => isset( $rule['enabled'] ) ? (bool) $rule['enabled'] : false,
+			'schedule'          => isset( $rule['schedule'] ) ? sanitize_text_field( $rule['schedule'] ) : 'daily',
+			'custom_schedule'   => isset( $rule['custom_schedule'] ) ? absint( $rule['custom_schedule'] ) : 24,
+			'action'            => isset( $rule['action'] ) ? sanitize_text_field( $rule['action'] ) : '',
+			'specific_metadata' => isset( $rule['specific_metadata'] ) && is_array( $rule['specific_metadata'] )
 				? array_map( 'sanitize_text_field', $rule['specific_metadata'] )
 				: array(),
-			'conditions'       => array(),
+			'conditions'        => array(),
 		);
 
 		if ( isset( $rule['conditions'] ) && is_array( $rule['conditions'] ) ) {
@@ -275,16 +348,20 @@ class Playlist {
 	public function playlist_column_content( $content, $column_name, $term_id ) {
 		switch ( $column_name ) {
 			case 'playlist_id':
-				$playlist_id = get_term_meta( $term_id, 'playlist_id', true );
+				$meta        = get_term_meta( $term_id, 'yousync_playlist', true );
+				$data        = $meta ? json_decode( $meta, true ) : array();
+				$playlist_id = isset( $data['playlist_id'] ) ? $data['playlist_id'] : '';
 				$content     = $playlist_id ? esc_html( $playlist_id ) : '—';
 				break;
 
 			case 'sync_rules':
-				$sync_rules = get_term_meta( $term_id, 'sync_rules', true );
+				$meta       = get_term_meta( $term_id, 'yousync_playlist', true );
+				$data       = $meta ? json_decode( $meta, true ) : array();
+				$sync_rules = isset( $data['sync_rules'] ) ? $data['sync_rules'] : array();
 				if ( ! empty( $sync_rules ) && is_array( $sync_rules ) ) {
 					$enabled_count = count( array_filter( $sync_rules, function( $rule ) {
 						return isset( $rule['enabled'] ) && $rule['enabled'];
-					}));
+					} ) );
 					/* translators: 1: enabled rules count, 2: total rules count */
 					$content = sprintf( __( '%1$d of %2$d enabled', 'yousync' ), $enabled_count, count( $sync_rules ) );
 				} else {
@@ -294,25 +371,6 @@ class Playlist {
 		}
 
 		return $content;
-	}
-
-	/**
-	 * Get sync rule template HTML for JavaScript localization.
-	 *
-	 * @return string Template HTML.
-	 */
-	public function get_sync_rule_template_html() {
-		ob_start();
-		yousync_get_template_part(
-			'sync-rule-playlist',
-			null,
-			array(
-				'index'        => '{{INDEX}}',
-				'rule'         => array(),
-				'playlist_obj' => $this,
-			)
-		);
-		return ob_get_clean();
 	}
 }
 

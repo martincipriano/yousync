@@ -427,3 +427,20 @@ syncRules.addEventListener('click', function(e) {
 		}, 300)
 	}
 })
+
+/**
+ * Initialize TomSelect for specific metadata selects that were pre-populated
+ * server-side when loading existing sync rules with update_specific actions.
+ */
+document.addEventListener('DOMContentLoaded', function() {
+	syncRules.querySelectorAll('.ys-specific-metadata-wrapper:not(.ys-hidden) .ys-specific-metadata').forEach(function(select) {
+		if (select.tomselect) return
+		new TomSelect(select, {
+			closeAfterSelect: false,
+			hideSelected: true,
+			maxOptions: null,
+			placeholder: 'Select metadata to update',
+			plugins: ['remove_button']
+		})
+	})
+})

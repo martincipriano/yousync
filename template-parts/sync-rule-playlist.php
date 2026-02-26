@@ -3,14 +3,13 @@
  * Template part for displaying Playlist sync rule.
  *
  * Mirrors sync-rule.php (Channel) in structure and attribute conventions.
- * The only difference is the action dropdown contains Video-only options.
+ * The only difference is the action dropdown contains Playlist + Video options only.
  *
  * @package YouSync
  *
  * Variables available in this template:
  * @var int|string $index Rule index.
  * @var array      $rule Rule data.
- * @var object     $playlist_obj Playlist class instance.
  */
 
 // Exit if accessed directly.
@@ -18,14 +17,42 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$enabled         = isset( $rule['enabled'] ) ? $rule['enabled'] : true;
-$schedule        = isset( $rule['schedule'] ) ? $rule['schedule'] : 'daily';
-$custom_schedule = $rule['custom_schedule'] ?? 1;
-$action          = $rule['action'] ?? '';
-$conditions      = $rule['conditions'] ?? array();
+$enabled           = isset( $rule['enabled'] ) ? $rule['enabled'] : true;
+$schedule          = isset( $rule['schedule'] ) ? $rule['schedule'] : 'daily';
+$custom_schedule   = isset( $rule['custom_schedule'] ) ? $rule['custom_schedule'] : 1;
+$action            = isset( $rule['action'] ) ? $rule['action'] : '';
+$conditions        = isset( $rule['conditions'] ) ? $rule['conditions'] : array();
+$specific_metadata = isset( $rule['specific_metadata'] ) ? $rule['specific_metadata'] : array();
 
 // Dual-mode: Use provided $index or fallback to {{INDEX}} placeholder for JavaScript
-$rule_index = isset( $index ) ? esc_attr( $index ) : '{{INDEX}}'; ?>
+$rule_index = isset( $index ) ? esc_attr( $index ) : '{{INDEX}}';
+
+// Determine the resource type from the action
+$resource = '';
+if ( strpos( $action, 'playlist' ) === 0 ) {
+	$resource = 'playlist';
+} elseif ( strpos( $action, 'videos' ) === 0 ) {
+	$resource = 'video';
+}
+
+// Specific metadata — show wrapper when action contains update_specific
+$show_specific_metadata = $action && strpos( $action, 'update_specific' ) !== false;
+$metadata_options_html  = '';
+if ( $show_specific_metadata && $resource ) {
+	$metadata_options_html = yousync_return_template_part( 'options', $resource . '-metadata' );
+	// Mark saved values as selected
+	foreach ( $specific_metadata as $saved_value ) {
+		$metadata_options_html = str_replace(
+			'value="' . esc_attr( $saved_value ) . '"',
+			'value="' . esc_attr( $saved_value ) . '" selected',
+			$metadata_options_html
+		);
+	}
+}
+
+// Field options HTML for conditions (based on resource)
+$field_options_tpl = $resource ? yousync_return_template_part( 'options', $resource . '-fields' ) : '';
+?>
 
 <div class="ys-sync-rule" data-rule-index="<?php echo $rule_index; ?>">
 
@@ -49,7 +76,7 @@ $rule_index = isset( $index ) ? esc_attr( $index ) : '{{INDEX}}'; ?>
 			</div>
 			<div class="ys-form-group">
 				<label for="ys-custom-schedule-<?php echo $rule_index; ?>">Custom (Hours)</label>
-				<input class="ys-number ys-custom-sync-schedule" disabled id="ys-custom-schedule-<?php echo $rule_index; ?>" name="sync_rules[<?php echo $rule_index; ?>][custom_schedule]" value="<?php echo esc_attr( $custom_schedule ); ?>" min="1" placeholder="Eg. 24" type="number">
+				<input class="ys-number ys-custom-sync-schedule" <?php echo 'custom' !== $schedule ? 'disabled' : ''; ?> id="ys-custom-schedule-<?php echo $rule_index; ?>" name="sync_rules[<?php echo $rule_index; ?>][custom_schedule]" value="<?php echo esc_attr( $custom_schedule ); ?>" min="1" placeholder="Eg. 24" type="number">
 			</div>
 		</div>
 
@@ -71,22 +98,73 @@ $rule_index = isset( $index ) ? esc_attr( $index ) : '{{INDEX}}'; ?>
 			</select>
 		</div>
 
-		<div class="ys-form-group ys-hidden ys-specific-metadata-wrapper">
+		<div class="ys-form-group <?php echo $show_specific_metadata ? '' : 'ys-hidden'; ?> ys-specific-metadata-wrapper">
 			<label for="ys-specific-metadata-<?php echo $rule_index; ?>">Fields to Update</label>
-			<select class="ys-select ys-specific-metadata" id="ys-specific-metadata-<?php echo $rule_index; ?>" name="sync_rules[<?php echo $rule_index; ?>][specific_metadata][]" multiple placeholder="Select fields to update..."></select>
+			<select class="ys-select ys-specific-metadata" id="ys-specific-metadata-<?php echo $rule_index; ?>" name="sync_rules[<?php echo $rule_index; ?>][specific_metadata][]" multiple placeholder="Select metadata to update...">
+				<?php if ( $show_specific_metadata ) echo $metadata_options_html; ?>
+			</select>
 		</div>
 
 		<fieldset class="ys-fieldset ys-conditions-wrapper">
 			<legend class="ys-mt-4"><strong>Conditions</strong> &mdash; <a class="ys-add-condition" href="#">Add condition</a></legend>
 			<p class="description ys-mb-3">Add conditions to filter which videos are synced. Videos must match <strong>all</strong> conditions (AND logic). <br> To sync videos matching <strong>any</strong> condition (OR logic), create multiple sync rules.</p>
-			<div class="ys-conditions" data-rule-index="<?php echo $rule_index; ?>">
+			<div class="ys-conditions" data-rule-index="<?php echo $rule_index; ?>" data-resource="<?php echo esc_attr( $resource ); ?>">
 				<?php
+				// Render existing conditions with pre-populated field/operator/value
 				if ( ! empty( $conditions ) && is_array( $conditions ) ) {
 					foreach ( $conditions as $condition_index => $condition ) {
+						$cond_field    = isset( $condition['field'] ) ? $condition['field'] : '';
+						$cond_operator = isset( $condition['operator'] ) ? $condition['operator'] : '';
+						$cond_value    = isset( $condition['value'] ) ? $condition['value'] : '';
+
+						// Build field options with saved field pre-selected
+						$cond_field_options_html = $field_options_tpl ?: null;
+						if ( $cond_field_options_html && $cond_field ) {
+							// Remove selected from the blank placeholder
+							$cond_field_options_html = str_replace(
+								'<option disabled selected value="">',
+								'<option disabled value="">',
+								$cond_field_options_html
+							);
+							// Mark the saved field as selected
+							$cond_field_options_html = str_replace(
+								'value="' . esc_attr( $cond_field ) . '"',
+								'value="' . esc_attr( $cond_field ) . '" selected',
+								$cond_field_options_html
+							);
+						}
+
+						// Build operator options and value input if a field is selected
+						$cond_operator_html = null;
+						$cond_value_html    = null;
+						if ( $cond_field ) {
+							$field_type = yousync_get_condition_field_type( $cond_field );
+							if ( $field_type ) {
+								$cond_operator_html = yousync_return_template_part(
+									'options',
+									$field_type . '-operators',
+									array( 'operator' => $cond_operator )
+								);
+								$cond_value_html = yousync_return_template_part(
+									'input',
+									$field_type,
+									array(
+										'rule_index'      => $rule_index,
+										'condition_index' => $condition_index,
+										'value'           => $cond_value,
+										'disabled'        => false,
+									)
+								);
+							}
+						}
+
 						yousync_get_template_part( 'sync-rule', 'condition', array(
-							'rule_index'      => $rule_index,
-							'condition_index' => $condition_index,
-							'condition'       => $condition,
+							'rule_index'         => $rule_index,
+							'condition_index'    => $condition_index,
+							'condition'          => $condition,
+							'field_options_html' => $cond_field_options_html,
+							'operator_html'      => $cond_operator_html,
+							'value_html'         => $cond_value_html,
 						) );
 					}
 				}

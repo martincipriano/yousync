@@ -88,6 +88,39 @@ function yousync_return_template_part( $slug, $name = null, $args = array() ) {
 	return ob_get_clean();
 }
 
+/**
+ * Get the field type for a sync rule condition field.
+ *
+ * Used to determine which operators and value input to render.
+ *
+ * @param string $field The condition field name.
+ * @return string Field type: 'text', 'number', or 'date'. Empty string if unknown.
+ */
+function yousync_get_condition_field_type( $field ) {
+	$map = array(
+		// Channel fields
+		'channel_title'        => 'text',
+		'channel_description'  => 'text',
+		'subscriber_count'     => 'number',
+		'video_count'          => 'number',
+		// Playlist fields
+		'playlist_title'       => 'text',
+		'playlist_description' => 'text',
+		'playlist_video_count' => 'number',
+		// Video fields
+		'title'                => 'text',
+		'description'          => 'text',
+		'tags'                 => 'text',
+		'duration'             => 'number',
+		'published_date'       => 'date',
+		'video_category'       => 'text',
+		'view_count'           => 'number',
+		'like_count'           => 'number',
+		'comment_count'        => 'number',
+	);
+	return isset( $map[ $field ] ) ? $map[ $field ] : '';
+}
+
 // Load plugin files.
 require_once plugin_dir_path( __FILE__ ) . 'includes/settings.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-channel.php';
@@ -158,64 +191,178 @@ add_action( 'add_meta_boxes', 'yousync_add_video_metabox' );
  * @return void
  */
 function yousync_render_video_metabox( $post ) {
-	// Add a nonce field for security.
 	wp_nonce_field( 'yousync_save_video_meta', 'yousync_video_meta_nonce' );
 
-	// Get existing values.
-	$video_url = get_post_meta( $post->ID, '_yousync_video_url', true );
-	$video_id  = get_post_meta( $post->ID, '_yousync_video_id', true );
-	?>
-	<p>
-		<label for="yousync_video_url"><strong><?php esc_html_e( 'Video URL', 'yousync' ); ?></strong></label><br>
-		<input type="text" name="yousync_video_url" id="yousync_video_url" value="<?php echo esc_attr( $video_url ); ?>" style="width:100%;" />
-	</p>
+	$meta = get_post_meta( $post->ID, '_yousync_video', true );
+	$data = $meta ? json_decode( $meta, true ) : array();
+	if ( ! is_array( $data ) ) {
+		$data = array();
+	}
 
-	<p>
-		<label for="yousync_video_id"><strong><?php esc_html_e( 'Video ID', 'yousync' ); ?></strong></label><br>
-		<input type="text" name="yousync_video_id" id="yousync_video_id" value="<?php echo esc_attr( $video_id ); ?>" style="width:100%;" />
-	</p>
+	// Editable fields
+	$video_id  = isset( $data['video_id'] ) ? $data['video_id'] : '';
+	$video_url = isset( $data['video_url'] ) ? $data['video_url'] : '';
+
+	// Read-only YouTube data
+	$original_title   = isset( $data['original_title'] ) ? $data['original_title'] : '';
+	$channel_title    = isset( $data['channel_title'] ) ? $data['channel_title'] : '';
+	$published_date   = isset( $data['published_date'] ) ? $data['published_date'] : '';
+	$duration_seconds = isset( $data['duration_seconds'] ) ? $data['duration_seconds'] : '';
+	$view_count       = isset( $data['view_count'] ) ? $data['view_count'] : '';
+	$like_count       = isset( $data['like_count'] ) ? $data['like_count'] : '';
+	$comment_count    = isset( $data['comment_count'] ) ? $data['comment_count'] : '';
+	$sync_source_type = isset( $data['sync_source_type'] ) ? $data['sync_source_type'] : '';
+	$last_synced      = isset( $data['last_synced'] ) ? $data['last_synced'] : '';
+	$sync_count       = isset( $data['sync_count'] ) ? $data['sync_count'] : 0;
+	$manual_edits     = isset( $data['manual_edits'] ) ? $data['manual_edits'] : false;
+	?>
+	<table class="form-table">
+		<tr>
+			<th scope="row">
+				<label for="yousync_video_id"><?php esc_html_e( 'Video ID', 'yousync' ); ?></label>
+			</th>
+			<td>
+				<input type="text" name="yousync_video_id" id="yousync_video_id" value="<?php echo esc_attr( $video_id ); ?>" class="regular-text">
+				<p class="description"><?php esc_html_e( 'YouTube video ID (e.g., dQw4w9WgXcQ)', 'yousync' ); ?></p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row">
+				<label for="yousync_video_url"><?php esc_html_e( 'Video URL', 'yousync' ); ?></label>
+			</th>
+			<td>
+				<input type="url" name="yousync_video_url" id="yousync_video_url" value="<?php echo esc_attr( $video_url ); ?>" class="regular-text">
+			</td>
+		</tr>
+
+		<?php if ( $original_title ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Original Title', 'yousync' ); ?></th>
+			<td><?php echo esc_html( $original_title ); ?></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $channel_title ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Channel', 'yousync' ); ?></th>
+			<td><?php echo esc_html( $channel_title ); ?></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $published_date ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Published Date', 'yousync' ); ?></th>
+			<td><?php echo esc_html( $published_date ); ?></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $duration_seconds !== '' ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Duration', 'yousync' ); ?></th>
+			<td>
+				<?php
+				$hours = floor( (int) $duration_seconds / 3600 );
+				$mins  = floor( ( (int) $duration_seconds % 3600 ) / 60 );
+				$secs  = (int) $duration_seconds % 60;
+				echo esc_html( $hours > 0
+					? sprintf( '%d:%02d:%02d', $hours, $mins, $secs )
+					: sprintf( '%d:%02d', $mins, $secs )
+				);
+				?>
+			</td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $view_count !== '' ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'View Count', 'yousync' ); ?></th>
+			<td><?php echo esc_html( number_format( (int) $view_count ) ); ?></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $like_count !== '' ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Like Count', 'yousync' ); ?></th>
+			<td><?php echo esc_html( number_format( (int) $like_count ) ); ?></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $comment_count !== '' ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Comment Count', 'yousync' ); ?></th>
+			<td><?php echo esc_html( number_format( (int) $comment_count ) ); ?></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $sync_source_type ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Sync Source', 'yousync' ); ?></th>
+			<td><?php echo esc_html( ucfirst( $sync_source_type ) ); ?></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $last_synced ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Last Synced', 'yousync' ); ?></th>
+			<td><?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $last_synced ) ); ?></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $sync_count ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Sync Count', 'yousync' ); ?></th>
+			<td><?php echo esc_html( $sync_count ); ?></td>
+		</tr>
+		<?php endif; ?>
+
+		<?php if ( $manual_edits ) : ?>
+		<tr>
+			<th scope="row"><?php esc_html_e( 'Manual Edits', 'yousync' ); ?></th>
+			<td><?php esc_html_e( 'Yes — title or description has been edited since last sync', 'yousync' ); ?></td>
+		</tr>
+		<?php endif; ?>
+	</table>
 	<?php
 }
 
 /**
  * Save video metabox data.
  *
+ * Merges editable fields (video_id, video_url) into the existing JSON meta,
+ * preserving all YouTube API data that was previously synced.
+ *
  * @param int $post_id The current post ID.
  * @return void
  */
 function yousync_save_video_meta( $post_id ) {
-	// Verify nonce.
 	if ( ! isset( $_POST['yousync_video_meta_nonce'] ) ||
 		! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['yousync_video_meta_nonce'] ) ), 'yousync_save_video_meta' ) ) {
 		return;
 	}
 
-	// Prevent autosave overwrite.
 	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
 		return;
 	}
 
-	// Check user capability.
 	if ( ! current_user_can( 'edit_post', $post_id ) ) {
 		return;
 	}
 
-	// Save video URL field.
-	if ( isset( $_POST['yousync_video_url'] ) ) {
-		update_post_meta(
-			$post_id,
-			'_yousync_video_url',
-			sanitize_text_field( wp_unslash( $_POST['yousync_video_url'] ) )
-		);
+	// Read existing JSON meta to preserve YouTube API data.
+	$existing_meta = get_post_meta( $post_id, '_yousync_video', true );
+	$data          = $existing_meta ? json_decode( $existing_meta, true ) : array();
+	if ( ! is_array( $data ) ) {
+		$data = array();
 	}
 
-	// Save video ID field.
+	// Update editable fields.
 	if ( isset( $_POST['yousync_video_id'] ) ) {
-		update_post_meta(
-			$post_id,
-			'_yousync_video_id',
-			sanitize_text_field( wp_unslash( $_POST['yousync_video_id'] ) )
-		);
+		$data['video_id'] = sanitize_text_field( wp_unslash( $_POST['yousync_video_id'] ) );
 	}
+	if ( isset( $_POST['yousync_video_url'] ) ) {
+		$data['video_url'] = esc_url_raw( wp_unslash( $_POST['yousync_video_url'] ) );
+	}
+
+	update_post_meta( $post_id, '_yousync_video', wp_json_encode( $data ) );
 }
 add_action( 'save_post_yousync_videos', 'yousync_save_video_meta' );
