@@ -163,6 +163,29 @@ test.describe('Channel – sync rule persistence', () => {
     await expect(saved.locator('.ys-custom-sync-schedule')).toBeEnabled();
   });
 
+  test('"once" schedule value persists on the edit page and keeps custom hours input disabled', async ({ page }) => {
+    const id = uniqueId();
+    await goToChannels(page);
+
+    await page.locator('input[name="tag-name"]').fill(`Once Sched Channel ${id}`);
+    await page.locator('input[name="channel_id"]').fill(`UC${id}`);
+    await page.locator('#ys-add-rule').click();
+
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-sync-schedule').selectOption('once');
+    await rule.locator('.ys-action').selectOption('videos_sync_new');
+
+    await page.locator('#submit').click();
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('#the-list tr').filter({ hasText: `Once Sched Channel ${id}` }).locator('a.row-title').click();
+    await page.waitForLoadState('networkidle');
+
+    const saved = page.locator('.ys-sync-rule').first();
+    await expect(saved.locator('.ys-sync-schedule')).toHaveValue('once');
+    await expect(saved.locator('.ys-custom-sync-schedule')).toBeDisabled();
+  });
+
   test('multiple sync rules persist with correct count in list column', async ({ page }) => {
     const id = uniqueId();
     await goToChannels(page);
@@ -417,6 +440,35 @@ test.describe('Channel – condition persistence', () => {
     await expect(saved.locator('.ys-condition-operator')).toHaveValue('less_than');
     await expect(saved.locator('.ys-condition-value')).toHaveValue('600');
   });
+
+  test('video_id condition field, operator, and value persist on the edit page', async ({ page }) => {
+    const id = uniqueId();
+    await goToChannels(page);
+
+    await page.locator('input[name="tag-name"]').fill(`VideoID Cond Channel ${id}`);
+    await page.locator('input[name="channel_id"]').fill(`UC${id}`);
+    await page.locator('#ys-add-rule').click();
+
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('videos_sync_new');
+    await rule.locator('.ys-add-condition').click();
+
+    const cond = rule.locator('.ys-condition').last();
+    await cond.locator('.ys-condition-field').selectOption('video_id');
+    await cond.locator('.ys-condition-operator').selectOption('contains');
+    await cond.locator('.ys-condition-value').fill('dQw4w9WgXcQ');
+
+    await page.locator('#submit').click();
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('#the-list tr').filter({ hasText: `VideoID Cond Channel ${id}` }).locator('a.row-title').click();
+    await page.waitForLoadState('networkidle');
+
+    const saved = page.locator('.ys-sync-rule').first().locator('.ys-condition').first();
+    await expect(saved.locator('.ys-condition-field')).toHaveValue('video_id');
+    await expect(saved.locator('.ys-condition-operator')).toHaveValue('contains');
+    await expect(saved.locator('.ys-condition-value')).toHaveValue('dQw4w9WgXcQ');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -556,6 +608,29 @@ test.describe('Playlist – sync rule persistence', () => {
     await expect(saved.locator('.ys-action')).toHaveValue('videos_sync_new');
   });
 
+  test('"once" schedule value persists on the edit page and keeps custom hours input disabled', async ({ page }) => {
+    const id = uniqueId();
+    await goToPlaylists(page);
+
+    await page.locator('input[name="tag-name"]').fill(`Once Sched Playlist ${id}`);
+    await page.locator('input[name="playlist_id"]').fill(`PL${id}`);
+    await page.locator('#ys-add-rule').click();
+
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-sync-schedule').selectOption('once');
+    await rule.locator('.ys-action').selectOption('videos_sync_new');
+
+    await page.locator('#submit').click();
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('#the-list tr').filter({ hasText: `Once Sched Playlist ${id}` }).locator('a.row-title').click();
+    await page.waitForLoadState('networkidle');
+
+    const saved = page.locator('.ys-sync-rule').first();
+    await expect(saved.locator('.ys-sync-schedule')).toHaveValue('once');
+    await expect(saved.locator('.ys-custom-sync-schedule')).toBeDisabled();
+  });
+
   test('playlist sync rule count shows correctly in list column', async ({ page }) => {
     const id = uniqueId();
     await goToPlaylists(page);
@@ -606,6 +681,35 @@ test.describe('Playlist – sync rule persistence', () => {
     await expect(saved.locator('.ys-condition-field')).toHaveValue('view_count');
     await expect(saved.locator('.ys-condition-operator')).toHaveValue('greater_than');
     await expect(saved.locator('.ys-condition-value')).toHaveValue('500');
+  });
+
+  test('video_id condition field, operator, and value persist on the edit page', async ({ page }) => {
+    const id = uniqueId();
+    await goToPlaylists(page);
+
+    await page.locator('input[name="tag-name"]').fill(`VideoID Cond Playlist ${id}`);
+    await page.locator('input[name="playlist_id"]').fill(`PL${id}`);
+    await page.locator('#ys-add-rule').click();
+
+    const rule = page.locator('.ys-sync-rule').last();
+    await rule.locator('.ys-action').selectOption('videos_sync_new');
+    await rule.locator('.ys-add-condition').click();
+
+    const cond = rule.locator('.ys-condition').last();
+    await cond.locator('.ys-condition-field').selectOption('video_id');
+    await cond.locator('.ys-condition-operator').selectOption('contains');
+    await cond.locator('.ys-condition-value').fill('dQw4w9WgXcQ');
+
+    await page.locator('#submit').click();
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('#the-list tr').filter({ hasText: `VideoID Cond Playlist ${id}` }).locator('a.row-title').click();
+    await page.waitForLoadState('networkidle');
+
+    const saved = page.locator('.ys-sync-rule').first().locator('.ys-condition').first();
+    await expect(saved.locator('.ys-condition-field')).toHaveValue('video_id');
+    await expect(saved.locator('.ys-condition-operator')).toHaveValue('contains');
+    await expect(saved.locator('.ys-condition-value')).toHaveValue('dQw4w9WgXcQ');
   });
 
   test('removing the only sync rule clears it from playlist metadata after save', async ({ page }) => {

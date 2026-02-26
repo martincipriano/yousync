@@ -1,4 +1,5 @@
 <option disabled selected value="">&mdash; Select field &mdash;</option>
+<option value="video_id" data-type="text">Video ID</option>
 <option value="title" data-type="text">Title</option>
 <option value="description" data-type="text">Description</option>
 <option value="tags" data-type="text">Tags</option>

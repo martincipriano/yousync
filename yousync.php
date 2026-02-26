@@ -108,6 +108,7 @@ function yousync_get_condition_field_type( $field ) {
 		'playlist_description' => 'text',
 		'playlist_video_count' => 'number',
 		// Video fields
+		'video_id'             => 'text',
 		'title'                => 'text',
 		'description'          => 'text',
 		'tags'                 => 'text',
@@ -125,6 +126,32 @@ function yousync_get_condition_field_type( $field ) {
 require_once plugin_dir_path( __FILE__ ) . 'includes/settings.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-channel.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-playlist.php';
+
+// Load sync engine.
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-youtube-api.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-condition-evaluator.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-video-importer.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-sync-runner.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-sync-scheduler.php';
+
+/**
+ * Instantiate the sync engine.
+ *
+ * Priority 5 — before Channel and Playlist constructors which hook into
+ * 'init' at default priority 10. This ensures the scheduler is ready to
+ * attach its priority-20 hooks when the taxonomy save hooks fire.
+ */
+add_action(
+	'init',
+	function () {
+		$api       = new \YouSync\YouTube_API( get_option( 'yousync_api_key', '' ) );
+		$evaluator = new \YouSync\Condition_Evaluator();
+		$importer  = new \YouSync\Video_Importer();
+		$runner    = new \YouSync\Sync_Runner( $api, $evaluator, $importer );
+		new \YouSync\Sync_Scheduler( $runner );
+	},
+	5
+);
 
 /**
  * Register YouSync Videos custom post type and taxonomies.
@@ -148,6 +175,8 @@ function yousync_init() {
 			'labels'              => array(
 				'name'          => __( 'Videos', 'yousync' ),
 				'singular_name' => __( 'Video', 'yousync' ),
+				'add_new'       => __( 'Add Video', 'yousync' ),
+				'add_new_item'  => __( 'Add New Video', 'yousync' ),
 			),
 			'public'              => $video_public,
 			'publicly_queryable'  => $video_enabled,
@@ -163,7 +192,51 @@ function yousync_init() {
 		)
 	);
 
-	// Note: Channel taxonomy is registered in includes/class-channel.php
+	// Register video_tag taxonomy.
+	register_taxonomy(
+		'video_tag',
+		'yousync_videos',
+		array(
+			'labels'            => array(
+				'name'          => __( 'Video Tags', 'yousync' ),
+				'singular_name' => __( 'Video Tag', 'yousync' ),
+				'menu_name'     => __( 'Tags', 'yousync' ),
+				'search_items'  => __( 'Search Video Tags', 'yousync' ),
+				'all_items'     => __( 'All Video Tags', 'yousync' ),
+				'edit_item'     => __( 'Edit Video Tag', 'yousync' ),
+				'add_new_item'  => __( 'Add New Video Tag', 'yousync' ),
+			),
+			'hierarchical'      => false,
+			'public'            => true,
+			'show_ui'           => true,
+			'show_admin_column' => true,
+			'rewrite'           => array( 'slug' => 'video-tag' ),
+		)
+	);
+
+	// Register video_category taxonomy.
+	register_taxonomy(
+		'video_category',
+		'yousync_videos',
+		array(
+			'labels'            => array(
+				'name'          => __( 'Video Categories', 'yousync' ),
+				'singular_name' => __( 'Video Category', 'yousync' ),
+				'menu_name'     => __( 'Categories', 'yousync' ),
+				'search_items'  => __( 'Search Video Categories', 'yousync' ),
+				'all_items'     => __( 'All Video Categories', 'yousync' ),
+				'edit_item'     => __( 'Edit Video Category', 'yousync' ),
+				'add_new_item'  => __( 'Add New Video Category', 'yousync' ),
+			),
+			'hierarchical'      => true,
+			'public'            => true,
+			'show_ui'           => true,
+			'show_admin_column' => true,
+			'rewrite'           => array( 'slug' => 'video-category' ),
+		)
+	);
+
+	// Note: Channel and Playlist taxonomies are registered in their respective class files.
 }
 add_action( 'init', 'yousync_init' );
 
@@ -417,3 +490,48 @@ function yousync_save_video_meta( $post_id ) {
 	update_post_meta( $post_id, '_yousync_video', wp_json_encode( $data ) );
 }
 add_action( 'save_post_yousync_videos', 'yousync_save_video_meta' );
+
+/**
+ * Reorder YouSync submenu items.
+ *
+ * Enforces the order: Videos, Add Video, Categories, Tags, Channels, Playlists, Settings.
+ *
+ * @return void
+ */
+function yousync_reorder_submenu(): void {
+	global $submenu;
+
+	$parent = 'edit.php?post_type=yousync_videos';
+
+	if ( empty( $submenu[ $parent ] ) ) {
+		return;
+	}
+
+	// Desired slug order.
+	$order = array(
+		'edit.php?post_type=yousync_videos',
+		'post-new.php?post_type=yousync_videos',
+		'edit-tags.php?taxonomy=video_category&post_type=yousync_videos',
+		'edit-tags.php?taxonomy=video_tag&post_type=yousync_videos',
+		'edit-tags.php?taxonomy=yousync_channel&post_type=yousync_videos',
+		'edit-tags.php?taxonomy=yousync_playlist&post_type=yousync_videos',
+		'yousync_settings',
+	);
+
+	$indexed = array();
+	$rest    = array();
+
+	foreach ( $submenu[ $parent ] as $item ) {
+		$slug = $item[2];
+		$pos  = array_search( $slug, $order, true );
+		if ( false !== $pos ) {
+			$indexed[ $pos ] = $item;
+		} else {
+			$rest[] = $item;
+		}
+	}
+
+	ksort( $indexed );
+	$submenu[ $parent ] = array_values( array_merge( $indexed, $rest ) );
+}
+add_action( 'admin_menu', 'yousync_reorder_submenu', 999 );
