@@ -131,8 +131,10 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/class-playlist.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-youtube-api.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-condition-evaluator.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-video-importer.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-sync-logger.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-sync-runner.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-sync-scheduler.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/admin-logs.php';
 
 /**
  * Instantiate the sync engine.
@@ -175,7 +177,7 @@ function yousync_init() {
 			'labels'              => array(
 				'name'          => __( 'Videos', 'yousync' ),
 				'singular_name' => __( 'Video', 'yousync' ),
-				'add_new'       => __( 'Add Video', 'yousync' ),
+				'add_new'       => __( 'Add New Video', 'yousync' ),
 				'add_new_item'  => __( 'Add New Video', 'yousync' ),
 			),
 			'public'              => $video_public,
@@ -209,7 +211,7 @@ function yousync_init() {
 			'hierarchical'      => false,
 			'public'            => true,
 			'show_ui'           => true,
-			'show_admin_column' => true,
+			'show_admin_column' => false,
 			'rewrite'           => array( 'slug' => 'video-tag' ),
 		)
 	);
@@ -231,7 +233,7 @@ function yousync_init() {
 			'hierarchical'      => true,
 			'public'            => true,
 			'show_ui'           => true,
-			'show_admin_column' => true,
+			'show_admin_column' => false,
 			'rewrite'           => array( 'slug' => 'video-category' ),
 		)
 	);
@@ -494,7 +496,10 @@ add_action( 'save_post_yousync_videos', 'yousync_save_video_meta' );
 /**
  * Reorder YouSync submenu items.
  *
- * Enforces the order: Videos, Add Video, Categories, Tags, Channels, Playlists, Settings.
+ * Enforces the order: Videos, Add New Video, Categories, Tags, Channels, Playlists, Settings.
+ *
+ * Uses str_contains for taxonomy slugs because WordPress omits the &post_type=
+ * suffix when a taxonomy uses a custom show_in_menu string.
  *
  * @return void
  */
@@ -507,31 +512,60 @@ function yousync_reorder_submenu(): void {
 		return;
 	}
 
-	// Desired slug order.
-	$order = array(
-		'edit.php?post_type=yousync_videos',
-		'post-new.php?post_type=yousync_videos',
-		'edit-tags.php?taxonomy=video_category&post_type=yousync_videos',
-		'edit-tags.php?taxonomy=video_tag&post_type=yousync_videos',
-		'edit-tags.php?taxonomy=yousync_channel&post_type=yousync_videos',
-		'edit-tags.php?taxonomy=yousync_playlist&post_type=yousync_videos',
-		'yousync_settings',
-	);
+	$position = static function ( string $slug ): int {
+		if ( 'edit.php?post_type=yousync_videos' === $slug ) return 0;
+		if ( 'post-new.php?post_type=yousync_videos' === $slug ) return 1;
+		if ( str_contains( $slug, 'taxonomy=video_category' ) ) return 2;
+		if ( str_contains( $slug, 'taxonomy=video_tag' ) ) return 3;
+		if ( str_contains( $slug, 'taxonomy=yousync_channel' ) ) return 4;
+		if ( str_contains( $slug, 'taxonomy=yousync_playlist' ) ) return 5;
+		if ( 'yousync_logs' === $slug ) return 6;
+		if ( 'yousync_settings' === $slug ) return 7;
+		return PHP_INT_MAX;
+	};
 
-	$indexed = array();
-	$rest    = array();
+	$items = array_values( $submenu[ $parent ] );
 
-	foreach ( $submenu[ $parent ] as $item ) {
-		$slug = $item[2];
-		$pos  = array_search( $slug, $order, true );
-		if ( false !== $pos ) {
-			$indexed[ $pos ] = $item;
-		} else {
-			$rest[] = $item;
-		}
-	}
+	usort( $items, static function ( array $a, array $b ) use ( $position ): int {
+		return $position( $a[2] ) - $position( $b[2] );
+	} );
 
-	ksort( $indexed );
-	$submenu[ $parent ] = array_values( array_merge( $indexed, $rest ) );
+	$submenu[ $parent ] = $items;
 }
 add_action( 'admin_menu', 'yousync_reorder_submenu', 999 );
+
+/**
+ * Add a "Protected" column to the yousync_videos post list.
+ *
+ * @param array $columns Existing columns.
+ * @return array Modified columns.
+ */
+function yousync_add_protected_column( array $columns ): array {
+	$columns['yousync_protected'] = '<span class="dashicons dashicons-lock" title="' . esc_attr__( 'Protected from Sync', 'yousync' ) . '"></span><span class="screen-reader-text">' . esc_html__( 'Protected from Sync', 'yousync' ) . '</span>';
+	return $columns;
+}
+add_filter( 'manage_yousync_videos_posts_columns', 'yousync_add_protected_column' );
+
+/**
+ * Render the "Protected" column value for each video post.
+ *
+ * @param string $column  Column slug.
+ * @param int    $post_id Post ID.
+ * @return void
+ */
+function yousync_render_protected_column( string $column, int $post_id ): void {
+	if ( 'yousync_protected' !== $column ) {
+		return;
+	}
+
+	$meta         = get_post_meta( $post_id, '_yousync_video', true );
+	$data         = $meta ? json_decode( $meta, true ) : array();
+	$is_protected = ! empty( $data['manual_edits'] );
+
+	if ( $is_protected ) {
+		echo '<span class="dashicons dashicons-lock" style="color:#d63638;" title="' . esc_attr__( 'Protected from Sync', 'yousync' ) . '"></span>';
+	} else {
+		echo '<span style="color:#ddd;">&mdash;</span>';
+	}
+}
+add_action( 'manage_yousync_videos_posts_custom_column', 'yousync_render_protected_column', 10, 2 );

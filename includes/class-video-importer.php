@@ -170,8 +170,8 @@ class Video_Importer {
 		$existing_meta = is_string( $raw ) ? ( json_decode( $raw, true ) ?: array() ) : array();
 		$manual_edits  = (bool) ( $existing_meta['manual_edits'] ?? false );
 
-		// Skip manually-edited posts for non_modified modes.
-		if ( $manual_edits && in_array( $mode, array( 'update_non_modified', 'update_specific_non_modified' ), true ) ) {
+		// Protect from Sync takes absolute precedence over any sync rule update mode.
+		if ( $manual_edits ) {
 			return true;
 		}
 

@@ -61,7 +61,7 @@ class Channel {
 			'show_ui'           => true,
 			'show_in_menu'      => 'edit.php?post_type=yousync_videos',
 			'show_in_nav_menus' => false,
-			'show_admin_column' => true,
+			'show_admin_column' => false,
 			'hierarchical'      => false,
 			'query_var'         => false,
 			'rewrite'           => false,

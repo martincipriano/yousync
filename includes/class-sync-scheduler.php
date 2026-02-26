@@ -6,8 +6,10 @@
  * created/edited taxonomy actions (priority 20, after the meta save at 10)
  * to reschedule events whenever a channel or playlist is saved.
  *
- * Hook name convention: yousync_sync_{source_type}_{term_id}_rule_{rule_index}
- * Args passed to the hook: [ $source_type, $term_id, $rule_index ]
+ * All events use the single static hook 'yousync_sync_rule' with args
+ * [ $source_type, $term_id, $rule_index ]. A single add_action registered
+ * in the constructor ensures the listener is always available on every page
+ * load — including front-end requests that trigger WP Cron.
  *
  * @package YouSync
  */
@@ -27,7 +29,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Sync_Scheduler {
 
 	/**
-	 * Sync runner instance (used inside dispatch closures).
+	 * Static cron hook name used for all sync rule events.
+	 */
+	private const CRON_HOOK = 'yousync_sync_rule';
+
+	/**
+	 * Sync runner instance.
 	 *
 	 * @var Sync_Runner
 	 */
@@ -48,6 +55,10 @@ class Sync_Scheduler {
 	public function __construct( Sync_Runner $runner ) {
 		$this->runner = $runner;
 
+		// Always register the cron listener so WP Cron can dispatch events
+		// on any page load, not just when a term is being saved.
+		add_action( self::CRON_HOOK, array( $this, 'dispatch_sync' ), 10, 3 );
+
 		// Register custom cron intervals (monthly, custom-N-hour).
 		add_filter( 'cron_schedules', array( $this, 'register_custom_intervals' ) );
 
@@ -58,6 +69,24 @@ class Sync_Scheduler {
 		// Reschedule events after a playlist is saved.
 		add_action( 'created_yousync_playlist', array( $this, 'reschedule_playlist_rules' ), 20, 2 );
 		add_action( 'edited_yousync_playlist', array( $this, 'reschedule_playlist_rules' ), 20, 2 );
+	}
+
+	// -------------------------------------------------------------------------
+	// Cron dispatch
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Dispatch a sync rule when the cron event fires.
+	 *
+	 * Called by WP Cron via the 'yousync_sync_rule' hook.
+	 *
+	 * @param string $source_type 'channel' or 'playlist'.
+	 * @param int    $term_id     Term ID.
+	 * @param int    $rule_index  Rule index.
+	 * @return void
+	 */
+	public function dispatch_sync( string $source_type, int $term_id, int $rule_index ): void {
+		$this->runner->run( $source_type, $term_id, $rule_index );
 	}
 
 	// -------------------------------------------------------------------------
@@ -146,7 +175,7 @@ class Sync_Scheduler {
 	 * @return void
 	 */
 	private function reschedule_rules_for_term( string $source_type, int $term_id, array $rules ): void {
-		// Clear every existing cron hook for this term across all rule indices.
+		// Clear every existing cron event for this term across all rule indices.
 		$this->unschedule_all_rules_for_term( $source_type, $term_id );
 
 		foreach ( $rules as $index => $rule ) {
@@ -161,8 +190,8 @@ class Sync_Scheduler {
 	/**
 	 * Unschedule all existing cron events for a term.
 	 *
-	 * Iterates indices 0..MAX_RULE_INDEX and calls wp_unschedule_hook()
-	 * on each possible hook name so stale events from deleted rules are cleared.
+	 * Iterates indices 0..MAX_RULE_INDEX and unschedules any queued event
+	 * matching the static hook + args combination for this term.
 	 *
 	 * @param string $source_type 'channel' or 'playlist'.
 	 * @param int    $term_id     Term ID.
@@ -170,11 +199,11 @@ class Sync_Scheduler {
 	 */
 	private function unschedule_all_rules_for_term( string $source_type, int $term_id ): void {
 		for ( $i = 0; $i < self::MAX_RULE_INDEX; $i++ ) {
-			$hook = $this->hook_name( $source_type, $term_id, $i );
+			$args      = array( $source_type, $term_id, $i );
+			$timestamp = wp_next_scheduled( self::CRON_HOOK, $args );
 
-			// wp_unschedule_hook() removes all scheduled events for this hook name.
-			if ( wp_next_scheduled( $hook ) ) {
-				wp_unschedule_hook( $hook );
+			if ( $timestamp ) {
+				wp_unschedule_event( $timestamp, self::CRON_HOOK, $args );
 			}
 		}
 	}
@@ -182,8 +211,9 @@ class Sync_Scheduler {
 	/**
 	 * Schedule a single cron event for a rule.
 	 *
-	 * Skips scheduling if an event for this hook is already queued
-	 * (prevents duplicate events when the admin page is saved multiple times).
+	 * Uses the static 'yousync_sync_rule' hook with [ source_type, term_id,
+	 * rule_index ] as args. Skips scheduling if an event for this args
+	 * combination is already queued.
 	 *
 	 * @param string $source_type 'channel' or 'playlist'.
 	 * @param int    $term_id     Term ID.
@@ -192,51 +222,26 @@ class Sync_Scheduler {
 	 * @return void
 	 */
 	private function schedule_rule( string $source_type, int $term_id, int $rule_index, array $rule ): void {
-		$hook     = $this->hook_name( $source_type, $term_id, $rule_index );
 		$args     = array( $source_type, $term_id, $rule_index );
 		$schedule = $rule['schedule'] ?? 'daily';
 
-		// Register the cron action to call the runner.
-		// Using a closure captures $this->runner without a public method.
-		$runner = $this->runner;
-		add_action(
-			$hook,
-			static function ( $st, $tid, $ri ) use ( $runner ) {
-				$runner->run( $st, $tid, $ri );
-			},
-			10,
-			3
-		);
-
 		// Already scheduled — don't add another event.
-		if ( wp_next_scheduled( $hook, $args ) ) {
+		if ( wp_next_scheduled( self::CRON_HOOK, $args ) ) {
 			return;
 		}
 
 		if ( 'once' === $schedule ) {
-			wp_schedule_single_event( time(), $hook, $args );
+			wp_schedule_single_event( time(), self::CRON_HOOK, $args );
 			return;
 		}
 
 		$interval = $this->wp_interval( $schedule, (int) ( $rule['custom_schedule'] ?? 24 ) );
-		wp_schedule_event( time(), $interval, $hook, $args );
+		wp_schedule_event( time(), $interval, self::CRON_HOOK, $args );
 	}
 
 	// -------------------------------------------------------------------------
 	// Helpers
 	// -------------------------------------------------------------------------
-
-	/**
-	 * Build the WP Cron hook name for a rule.
-	 *
-	 * @param string $source_type 'channel' or 'playlist'.
-	 * @param int    $term_id     Term ID.
-	 * @param int    $rule_index  Rule index.
-	 * @return string Hook name.
-	 */
-	private function hook_name( string $source_type, int $term_id, int $rule_index ): string {
-		return "yousync_sync_{$source_type}_{$term_id}_rule_{$rule_index}";
-	}
 
 	/**
 	 * Map a schedule value to a registered WP Cron interval name.

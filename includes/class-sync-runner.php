@@ -831,6 +831,10 @@ class Sync_Runner {
 	 * @return void
 	 */
 	private function record_error( string $source_type, int $term_id, string $error, string $code = '' ): void {
+		// Write to the global error log (single option, capped at 50 entries).
+		Sync_Logger::log_error( $source_type, $term_id, $error, $code );
+
+		// Also store the last 5 errors in term meta for quick display on the edit page.
 		$data = $this->get_term_meta_data( $source_type, $term_id );
 		if ( ! $data ) {
 			return;
