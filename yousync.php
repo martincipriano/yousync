@@ -199,13 +199,10 @@ function yousync_render_video_metabox( $post ) {
 		$data = array();
 	}
 
-	// Editable fields
-	$video_id     = isset( $data['video_id'] ) ? $data['video_id'] : '';
-	$video_url    = isset( $data['video_url'] ) ? $data['video_url'] : '';
-	$channel_id   = isset( $data['channel_id'] ) ? $data['channel_id'] : '';
-	$manual_edits = isset( $data['manual_edits'] ) ? (bool) $data['manual_edits'] : false;
-
-	// Read-only YouTube data
+	$video_id             = isset( $data['video_id'] ) ? $data['video_id'] : '';
+	$video_url            = isset( $data['video_url'] ) ? $data['video_url'] : '';
+	$channel_id           = isset( $data['channel_id'] ) ? $data['channel_id'] : '';
+	$manual_edits         = isset( $data['manual_edits'] ) ? (bool) $data['manual_edits'] : false;
 	$original_title       = isset( $data['original_title'] ) ? $data['original_title'] : '';
 	$original_description = isset( $data['original_description'] ) ? $data['original_description'] : '';
 	$channel_title        = isset( $data['channel_title'] ) ? $data['channel_title'] : '';
@@ -221,33 +218,27 @@ function yousync_render_video_metabox( $post ) {
 	?>
 
 	<table class="form-table">
+		<?php if ( $video_id ) : ?>
 		<tr>
-			<th scope="row">
-				<label for="yousync_video_id"><?php esc_html_e( 'Video ID', 'yousync' ); ?></label>
-			</th>
-			<td>
-				<input type="text" name="yousync_video_id" id="yousync_video_id" value="<?php echo esc_attr( $video_id ); ?>" class="regular-text">
-				<p class="description"><?php esc_html_e( 'YouTube video ID (e.g., dQw4w9WgXcQ)', 'yousync' ); ?></p>
-			</td>
+			<th scope="row"><?php esc_html_e( 'Video ID', 'yousync' ); ?></th>
+			<td><code><?php echo esc_html( $video_id ); ?></code></td>
 		</tr>
+		<?php endif; ?>
+
+		<?php if ( $video_url ) : ?>
 		<tr>
-			<th scope="row">
-				<label for="yousync_video_url"><?php esc_html_e( 'Video URL', 'yousync' ); ?></label>
-			</th>
-			<td>
-				<input type="url" name="yousync_video_url" id="yousync_video_url" value="<?php echo esc_attr( $video_url ); ?>" class="regular-text">
-				<p class="description"><?php esc_html_e( 'Full YouTube URL (e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ)', 'yousync' ); ?></p>
-			</td>
+			<th scope="row"><?php esc_html_e( 'Video URL', 'yousync' ); ?></th>
+			<td><a href="<?php echo esc_url( $video_url ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $video_url ); ?></a></td>
 		</tr>
+		<?php endif; ?>
+
+		<?php if ( $channel_id ) : ?>
 		<tr>
-			<th scope="row">
-				<label for="yousync_channel_id"><?php esc_html_e( 'Channel ID', 'yousync' ); ?></label>
-			</th>
-			<td>
-				<input type="text" name="yousync_channel_id" id="yousync_channel_id" value="<?php echo esc_attr( $channel_id ); ?>" class="regular-text">
-				<p class="description"><?php esc_html_e( 'YouTube channel ID (e.g., UCuAXFkgsw1L7xaCfnd5JJOw)', 'yousync' ); ?></p>
-			</td>
+			<th scope="row"><?php esc_html_e( 'Channel ID', 'yousync' ); ?></th>
+			<td><code><?php echo esc_html( $channel_id ); ?></code></td>
 		</tr>
+		<?php endif; ?>
+
 		<tr>
 			<th scope="row">
 				<label for="yousync_manual_edits"><?php esc_html_e( 'Protect from Sync', 'yousync' ); ?></label>
@@ -392,8 +383,9 @@ function yousync_render_video_metabox( $post ) {
 /**
  * Save video metabox data.
  *
- * Merges editable fields (video_id, video_url, channel_id, manual_edits) into
- * the existing JSON meta, preserving all YouTube API data previously synced.
+ * Merges the manual_edits flag into the existing JSON meta, preserving all
+ * YouTube API data previously synced. All other fields are read-only and
+ * written only by the sync engine.
  *
  * @param int $post_id The current post ID.
  * @return void
@@ -419,16 +411,7 @@ function yousync_save_video_meta( $post_id ) {
 		$data = array();
 	}
 
-	// Update editable fields.
-	if ( isset( $_POST['yousync_video_id'] ) ) {
-		$data['video_id'] = sanitize_text_field( wp_unslash( $_POST['yousync_video_id'] ) );
-	}
-	if ( isset( $_POST['yousync_video_url'] ) ) {
-		$data['video_url'] = esc_url_raw( wp_unslash( $_POST['yousync_video_url'] ) );
-	}
-	if ( isset( $_POST['yousync_channel_id'] ) ) {
-		$data['channel_id'] = sanitize_text_field( wp_unslash( $_POST['yousync_channel_id'] ) );
-	}
+	// The only user-controlled field is the protect-from-sync flag.
 	$data['manual_edits'] = isset( $_POST['yousync_manual_edits'] ) && '1' === $_POST['yousync_manual_edits'];
 
 	update_post_meta( $post_id, '_yousync_video', wp_json_encode( $data ) );
