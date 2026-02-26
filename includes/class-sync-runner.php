@@ -203,7 +203,38 @@ class Sync_Runner {
 		}
 
 		// Batch-fetch full video details and import.
-		$this->batch_fetch_and_import( $new_ids, $conditions, $source_type, $term_id );
+		$imported = $this->batch_fetch_and_import( $new_ids, $conditions, $source_type, $term_id );
+
+		// Warn when candidates were available but nothing was imported.
+		// This usually means the sync conditions are too restrictive or contain a typo.
+		if ( 0 === $imported ) {
+			$candidate_count = count( $new_ids );
+			if ( ! empty( $conditions ) ) {
+				$message = sprintf(
+					/* translators: %d: number of candidate videos */
+					_n(
+						'No videos were imported. %d candidate was fetched but did not match the sync conditions. Check your conditions for typos.',
+						'No videos were imported. %d candidates were fetched but none matched the sync conditions. Check your conditions for typos.',
+						$candidate_count,
+						'yousync'
+					),
+					$candidate_count
+				);
+			} else {
+				$message = sprintf(
+					/* translators: %d: number of candidate videos */
+					_n(
+						'No videos were imported. %d candidate was fetched from the API but could not be saved.',
+						'No videos were imported. %d candidates were fetched from the API but none could be saved.',
+						$candidate_count,
+						'yousync'
+					),
+					$candidate_count
+				);
+			}
+
+			Sync_Logger::log_error( $source_type, $term_id, $message, 'no_results' );
+		}
 	}
 
 	// -------------------------------------------------------------------------
@@ -458,15 +489,16 @@ class Sync_Runner {
 	 * @param array    $conditions  Conditions array from the rule.
 	 * @param string   $source_type 'channel' or 'playlist'.
 	 * @param int      $term_id     Source term ID.
-	 * @return void
+	 * @return int Number of videos successfully imported.
 	 */
 	private function batch_fetch_and_import(
 		array $video_ids,
 		array $conditions,
 		string $source_type,
 		int $term_id
-	): void {
-		$chunks = array_chunk( $video_ids, 50 );
+	): int {
+		$chunks   = array_chunk( $video_ids, 50 );
+		$imported = 0;
 
 		foreach ( $chunks as $chunk ) {
 			$videos = $this->api->get_videos_by_ids( $chunk );
@@ -487,9 +519,13 @@ class Sync_Runner {
 				if ( is_wp_error( $result ) ) {
 					// Log import errors but continue with remaining videos.
 					$this->record_error( $source_type, $term_id, $result->get_error_message(), $result->get_error_code() );
+				} else {
+					++$imported;
 				}
 			}
 		}
+
+		return $imported;
 	}
 
 	/**
