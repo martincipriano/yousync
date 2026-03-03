@@ -23,6 +23,7 @@ class Channel {
 	public function __construct() {
 		add_action( 'init', array( $this, 'register_taxonomy' ) );
 		add_action( 'yousync_channel_add_form_fields', array( $this, 'add_channel_fields' ) );
+		add_action( 'yousync_channel_pre_edit_form', array( $this, 'render_channel_hero' ), 10, 2 );
 		add_action( 'yousync_channel_edit_form_fields', array( $this, 'edit_channel_fields' ), 10, 2 );
 		add_action( 'created_yousync_channel', array( $this, 'save_channel_meta' ), 10, 2 );
 		add_action( 'edited_yousync_channel', array( $this, 'save_channel_meta' ), 10, 2 );
@@ -109,16 +110,10 @@ class Channel {
 			$data = array();
 		}
 
-		$channel_id          = isset( $data['channel_id'] ) ? $data['channel_id'] : '';
-		$sync_rules          = isset( $data['sync_rules'] ) ? $data['sync_rules'] : array();
-		$channel_title       = isset( $data['channel_title'] ) ? $data['channel_title'] : '';
-		$channel_description = isset( $data['channel_description'] ) ? $data['channel_description'] : '';
-		$subscriber_count    = isset( $data['subscriber_count'] ) ? $data['subscriber_count'] : '';
-		$video_count         = isset( $data['video_count'] ) ? $data['video_count'] : '';
-		$profile_picture     = isset( $data['profile_picture'] ) ? $data['profile_picture'] : array();
-		$banner_image        = isset( $data['banner_image'] ) ? $data['banner_image'] : array();
-		$last_synced         = isset( $data['last_synced'] ) ? $data['last_synced'] : '';
-		$sync_count          = isset( $data['sync_count'] ) ? $data['sync_count'] : 0;
+		$channel_id       = isset( $data['channel_id'] ) ? $data['channel_id'] : '';
+		$sync_rules       = isset( $data['sync_rules'] ) ? $data['sync_rules'] : array();
+		$channel_title    = isset( $data['channel_title'] ) ? $data['channel_title'] : '';
+		$subscriber_count = isset( $data['subscriber_count'] ) ? $data['subscriber_count'] : '';
 		?>
 
 		<tr class="form-field term-channel-id-wrap">
@@ -133,72 +128,21 @@ class Channel {
 			</td>
 		</tr>
 
+		<?php if ( $channel_title || $subscriber_count !== '' ) : ?>
+
 		<?php if ( $channel_title ) : ?>
 		<tr class="form-field">
 			<th scope="row"><?php esc_html_e( 'Channel Title', 'yousync' ); ?></th>
-			<td><p><?php echo esc_html( $channel_title ); ?></p></td>
-		</tr>
-		<?php endif; ?>
-
-		<?php if ( $channel_description ) : ?>
-		<tr class="form-field">
-			<th scope="row"><?php esc_html_e( 'Description', 'yousync' ); ?></th>
-			<td><p><?php echo esc_html( $channel_description ); ?></p></td>
-		</tr>
-		<?php endif; ?>
-
-		<?php if ( ! empty( $profile_picture ) ) : ?>
-		<tr class="form-field">
-			<th scope="row"><?php esc_html_e( 'Profile Picture', 'yousync' ); ?></th>
-			<td>
-				<?php if ( ! empty( $profile_picture['attachment_id'] ) ) : ?>
-					<?php echo wp_get_attachment_image( (int) $profile_picture['attachment_id'], array( 96, 96 ) ); ?>
-				<?php elseif ( ! empty( $profile_picture['url'] ) ) : ?>
-					<img src="<?php echo esc_url( $profile_picture['url'] ); ?>" width="96" height="96" alt="">
-				<?php endif; ?>
-			</td>
-		</tr>
-		<?php endif; ?>
-
-		<?php if ( ! empty( $banner_image ) ) : ?>
-		<tr class="form-field">
-			<th scope="row"><?php esc_html_e( 'Banner Image', 'yousync' ); ?></th>
-			<td>
-				<?php if ( ! empty( $banner_image['attachment_id'] ) ) : ?>
-					<?php echo wp_get_attachment_image( (int) $banner_image['attachment_id'], 'medium' ); ?>
-				<?php elseif ( ! empty( $banner_image['url'] ) ) : ?>
-					<img src="<?php echo esc_url( $banner_image['url'] ); ?>" style="max-width:300px;height:auto;" alt="">
-				<?php endif; ?>
-			</td>
+			<td><?php echo esc_html( $channel_title ); ?></td>
 		</tr>
 		<?php endif; ?>
 
 		<?php if ( $subscriber_count !== '' ) : ?>
 		<tr class="form-field">
 			<th scope="row"><?php esc_html_e( 'Subscribers', 'yousync' ); ?></th>
-			<td><p><?php echo esc_html( number_format( (int) $subscriber_count ) ); ?></p></td>
+			<td><?php echo esc_html( number_format( (int) $subscriber_count ) ); ?></td>
 		</tr>
 		<?php endif; ?>
-
-		<?php if ( $video_count !== '' ) : ?>
-		<tr class="form-field">
-			<th scope="row"><?php esc_html_e( 'Videos', 'yousync' ); ?></th>
-			<td><p><?php echo esc_html( number_format( (int) $video_count ) ); ?></p></td>
-		</tr>
-		<?php endif; ?>
-
-		<?php if ( $last_synced ) : ?>
-		<tr class="form-field">
-			<th scope="row"><?php esc_html_e( 'Last Synced', 'yousync' ); ?></th>
-			<td><p><?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $last_synced ) ); ?></p></td>
-		</tr>
-		<?php endif; ?>
-
-		<?php if ( $sync_count ) : ?>
-		<tr class="form-field">
-			<th scope="row"><?php esc_html_e( 'Sync Count', 'yousync' ); ?></th>
-			<td><p><?php echo esc_html( $sync_count ); ?></p></td>
-		</tr>
 		<?php endif; ?>
 
 		<tr class="form-field term-sync-rules-wrap">
@@ -206,9 +150,66 @@ class Channel {
 				<label><?php esc_html_e( 'Sync Rules', 'yousync' ); ?></label>
 			</th>
 			<td>
-				<?php $this->render_sync_rules_section( $sync_rules ); ?>
+				<?php $this->render_sync_rules_section( $sync_rules, $data['video_count'] ?? 0, $term->term_id ); ?>
 			</td>
 		</tr>
+
+		<?php
+	}
+
+	/**
+	 * Render the channel hero (banner + profile picture) before the edit form.
+	 *
+	 * Outputs a hidden <div> that JavaScript moves to just after the page <h1>.
+	 *
+	 * @param WP_Term $term     Current taxonomy term object.
+	 * @param string  $taxonomy Current taxonomy slug.
+	 * @return void
+	 */
+	public function render_channel_hero( $term, $taxonomy ): void {
+		$meta = get_term_meta( $term->term_id, 'yousync_channel', true );
+		$data = $meta ? json_decode( $meta, true ) : array();
+		if ( ! is_array( $data ) ) {
+			$data = array();
+		}
+
+		$profile_picture = isset( $data['profile_picture'] ) && is_array( $data['profile_picture'] ) ? $data['profile_picture'] : array();
+		$banner_image    = isset( $data['banner_image'] ) && is_array( $data['banner_image'] ) ? $data['banner_image'] : array();
+
+		$banner_src = '';
+		if ( ! empty( $banner_image['attachment_id'] ) ) {
+			$img        = wp_get_attachment_image_src( (int) $banner_image['attachment_id'], 'full' );
+			$banner_src = $img ? $img[0] : '';
+		} elseif ( ! empty( $banner_image['url'] ) ) {
+			$banner_src = $banner_image['url'];
+		}
+
+		$profile_src = '';
+		if ( ! empty( $profile_picture['attachment_id'] ) ) {
+			$img         = wp_get_attachment_image_src( (int) $profile_picture['attachment_id'], 'thumbnail' );
+			$profile_src = $img ? $img[0] : '';
+		} elseif ( ! empty( $profile_picture['url'] ) ) {
+			$profile_src = $profile_picture['url'];
+		}
+
+		if ( ! $banner_src && ! $profile_src ) {
+			return;
+		}
+		?>
+		<div id="ys-channel-hero">
+			<div class="ys-hero-inner">
+				<?php if ( $banner_src ) : ?>
+				<img src="<?php echo esc_url( $banner_src ); ?>" class="ys-hero-banner" alt="">
+				<?php else : ?>
+				<div class="ys-hero-banner-placeholder"></div>
+				<?php endif; ?>
+				<?php if ( $profile_src ) : ?>
+				<div class="ys-hero-profile">
+					<img src="<?php echo esc_url( $profile_src ); ?>" width="110" height="110" alt="">
+				</div>
+				<?php endif; ?>
+			</div>
+		</div>
 		<?php
 	}
 
@@ -218,17 +219,19 @@ class Channel {
 	 * @param array $sync_rules Existing sync rules.
 	 * @return void
 	 */
-	private function render_sync_rules_section( $sync_rules = array() ) : void
+	private function render_sync_rules_section( $sync_rules = array(), $video_count = 0, $term_id = 0 ) : void
 	{
 		$html = '';
 		foreach ( $sync_rules as $index => $rule ) {
 			$html .= yousync_return_template_part( 'sync-rule', null, array(
-				'index' => $index,
-				'rule'  => $rule,
+				'index'       => $index,
+				'rule'        => $rule,
+				'term_id'     => $term_id,
+				'source_type' => 'channel',
 			) );
 		} ?>
-		<p class="ys-mb-3 ys-mt-4"><strong>Sync Rules</strong> &mdash; <a class="ys-add-rule" href="#" id="ys-add-rule"><?php esc_html_e( 'Add sync rule', 'yousync' ); ?></a></p>
-		<div class="ys-sync-rules" id="ys-sync-rules"><?php echo $html; ?></div>
+		<p class="ys-mb-3"><strong>Sync Rules</strong> &mdash; <a class="ys-add-rule" href="#" id="ys-add-rule"><?php esc_html_e( 'Add sync rule', 'yousync' ); ?></a></p>
+		<div class="ys-sync-rules" id="ys-sync-rules" data-video-count="<?php echo (int) $video_count; ?>"><?php echo $html; ?></div>
 		<?php
 	}
 
@@ -277,6 +280,13 @@ class Channel {
 				'rule'      => yousync_return_template_part( 'sync-rule' ),
 			),
 		) );
+		wp_add_inline_script(
+			'yousync-admin',
+			'document.addEventListener("DOMContentLoaded", function () {
+				var hero = document.getElementById("ys-channel-hero");
+				if ( hero ) { hero.style.opacity = "1"; }
+			});'
+		);
 	}
 
 	/**
@@ -291,25 +301,66 @@ class Channel {
 	 */
 	public function save_channel_meta( $term_id, $tt_id ) {
 		// Read existing JSON meta to preserve YouTube API data.
-		$existing_meta = get_term_meta( $term_id, 'yousync_channel', true );
-		$data          = $existing_meta ? json_decode( $existing_meta, true ) : array();
+		$existing_meta  = get_term_meta( $term_id, 'yousync_channel', true );
+		$data           = $existing_meta ? json_decode( $existing_meta, true ) : array();
 		if ( ! is_array( $data ) ) {
 			$data = array();
 		}
 
+		// Capture old channel ID before overwriting.
+		$old_channel_id = $data['channel_id'] ?? '';
+
 		// Update editable fields.
-		if ( isset( $_POST['channel_id'] ) ) {
-			$data['channel_id'] = sanitize_text_field( wp_unslash( $_POST['channel_id'] ) );
-		}
+		$new_channel_id     = isset( $_POST['channel_id'] ) ? sanitize_text_field( wp_unslash( $_POST['channel_id'] ) ) : $old_channel_id;
+		$data['channel_id'] = $new_channel_id;
 
 		// Update sync rules (re-index to ensure sequential keys).
+		$old_rules = $data['sync_rules'] ?? array();
 		if ( isset( $_POST['sync_rules'] ) && is_array( $_POST['sync_rules'] ) ) {
-			$data['sync_rules'] = array_values( array_map( array( $this, 'sanitize_sync_rule' ), $_POST['sync_rules'] ) );
+			$new_rules = array_values( array_map( array( $this, 'sanitize_sync_rule' ), $_POST['sync_rules'] ) );
+			// Restore per-rule status fields not submitted via the form.
+			foreach ( $new_rules as $i => &$new_rule ) {
+				if ( isset( $old_rules[ $i ] ) ) {
+					$new_rule['sync_status'] = $old_rules[ $i ]['sync_status'] ?? '';
+					$new_rule['last_synced'] = $old_rules[ $i ]['last_synced'] ?? 0;
+					$new_rule['sync_count']  = $old_rules[ $i ]['sync_count'] ?? 0;
+					$new_rule['sync_errors'] = $old_rules[ $i ]['sync_errors'] ?? array();
+				}
+			}
+			unset( $new_rule );
+			$data['sync_rules'] = $new_rules;
 		} else {
 			$data['sync_rules'] = array();
 		}
 
-		update_term_meta( $term_id, 'yousync_channel', wp_json_encode( $data ) );
+		// Auto-fetch YouTube channel data when: the channel ID changes, the
+		// title is missing, or image fields have never been stored as arrays
+		// (covers the old string-format profile_picture from pre-fix syncs).
+		$api_key = get_option( 'yousync_api_key', '' );
+		if (
+			$api_key &&
+			$new_channel_id &&
+			(
+				$new_channel_id !== $old_channel_id ||
+				empty( $data['channel_title'] ) ||
+				! isset( $data['banner_image'] ) ||
+				! is_array( $data['profile_picture'] ?? null )
+			)
+		) {
+			$channel = ( new YouTube_API( $api_key ) )->get_channel_data( $new_channel_id );
+			if ( ! is_wp_error( $channel ) ) {
+				$data['channel_title']       = $channel['channel_title'];
+				$data['channel_description'] = $channel['channel_description'];
+				$data['subscriber_count']    = $channel['subscriber_count'];
+				$data['video_count']         = $channel['video_count'];
+				$data['profile_picture']     = $channel['profile_picture'];
+				$data['banner_image']        = $channel['banner_image'];
+				$data['etag']                = $channel['etag'];
+			}
+		}
+
+		update_term_meta( $term_id, 'yousync_channel', wp_slash( wp_json_encode( $data ) ) );
+		update_term_meta( $term_id, 'yousync_channel_id', $new_channel_id );
 	}
 
 	/**
@@ -354,11 +405,13 @@ class Channel {
 	 */
 	public function add_channel_columns( $columns ) {
 		$new_columns = array(
-			'cb'         => $columns['cb'],
-			'name'       => $columns['name'],
-			'channel_id' => __( 'Channel ID', 'yousync' ),
-			'sync_rules' => __( 'Sync Rules', 'yousync' ),
-			'posts'      => $columns['posts'],
+			'cb'          => $columns['cb'],
+			'name'        => $columns['name'],
+			'channel_id'  => __( 'Channel ID', 'yousync' ),
+			'sync_rules'  => __( 'Sync Rules', 'yousync' ),
+			'last_synced' => __( 'Last Synced', 'yousync' ),
+			'sync_count'  => __( 'Videos Synced', 'yousync' ),
+			'posts'       => $columns['posts'],
 		);
 
 		return $new_columns;
@@ -394,6 +447,21 @@ class Channel {
 				} else {
 					$content = __( 'No rules', 'yousync' );
 				}
+				break;
+
+			case 'last_synced':
+				$meta       = get_term_meta( $term_id, 'yousync_channel', true );
+				$data       = $meta ? json_decode( $meta, true ) : array();
+				$timestamps = array_filter( array_column( $data['sync_rules'] ?? array(), 'last_synced' ) );
+				$last       = $timestamps ? max( $timestamps ) : 0;
+				$content    = $last ? esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $last ) ) : '—';
+				break;
+
+			case 'sync_count':
+				$meta    = get_term_meta( $term_id, 'yousync_channel', true );
+				$data    = $meta ? json_decode( $meta, true ) : array();
+				$total   = (int) array_sum( array_column( $data['sync_rules'] ?? array(), 'sync_count' ) );
+				$content = (string) $total;
 				break;
 		}
 

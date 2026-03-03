@@ -69,7 +69,7 @@ class YouTube_API {
 		$url  = $this->api_url(
 			'channels',
 			array(
-				'part' => 'snippet,contentDetails,statistics',
+				'part' => 'snippet,contentDetails,statistics,brandingSettings',
 				'id'   => $channel_id,
 			)
 		);
@@ -80,7 +80,7 @@ class YouTube_API {
 		}
 
 		if ( empty( $data['items'] ) ) {
-			return new \WP_Error( 'channel_not_found', "Channel '{$channel_id}' not found or API key lacks access." );
+			return new \WP_Error( 'channel_not_found', "Channel not found. Please verify the Channel ID ({$channel_id}) in your channel settings." );
 		}
 
 		$item = $data['items'][0];
@@ -91,7 +91,8 @@ class YouTube_API {
 			'channel_description' => $item['snippet']['description'] ?? '',
 			'subscriber_count'    => (int) ( $item['statistics']['subscriberCount'] ?? 0 ),
 			'video_count'         => (int) ( $item['statistics']['videoCount'] ?? 0 ),
-			'profile_picture'     => $item['snippet']['thumbnails']['high']['url'] ?? '',
+			'profile_picture'     => array( 'url' => $item['snippet']['thumbnails']['high']['url'] ?? '' ),
+			'banner_image'        => array( 'url' => $this->banner_url( $item['brandingSettings']['image'] ?? array() ) ),
 			'etag'                => $item['etag'] ?? '',
 		);
 	}
@@ -275,7 +276,7 @@ class YouTube_API {
 		}
 
 		if ( empty( $data['items'] ) ) {
-			return new \WP_Error( 'playlist_not_found', "Playlist '{$playlist_id}' not found or API key lacks access." );
+			return new \WP_Error( 'playlist_not_found', "Playlist not found. Please verify the Playlist ID ({$playlist_id}) in your playlist settings." );
 		}
 
 		$item    = $data['items'][0];
@@ -296,6 +297,7 @@ class YouTube_API {
 			'playlist_description' => $snippet['description'] ?? '',
 			'playlist_video_count' => (int) ( $item['contentDetails']['itemCount'] ?? 0 ),
 			'thumbnail_url'        => $thumb_url,
+			'channel_id'           => $snippet['channelId'] ?? '',
 			'etag'                 => $item['etag'] ?? '',
 		);
 	}
@@ -371,6 +373,26 @@ class YouTube_API {
 	// -------------------------------------------------------------------------
 
 	/**
+	 * Resolve the best-quality banner URL from the brandingSettings image object.
+	 *
+	 * Google CDN URLs (yt3.googleusercontent.com) accept a size parameter appended
+	 * after the path, e.g. =w2560. bannerExternalUrl is the raw original upload URL
+	 * without any size constraint — appending =w2560 requests the full-width version.
+	 *
+	 * @param array $image brandingSettings.image object from the API.
+	 * @return string Banner URL.
+	 */
+	private function banner_url( array $image ): string {
+		$url = $image['bannerExternalUrl'] ?? $image['bannerTabletImageUrl'] ?? '';
+
+		if ( $url && str_contains( $url, 'googleusercontent.com' ) && ! str_contains( $url, '=' ) ) {
+			$url .= '=w2560';
+		}
+
+		return $url;
+	}
+
+	/**
 	 * Execute a GET request and return the decoded JSON body.
 	 *
 	 * @param string $url Full URL to request.
@@ -385,24 +407,81 @@ class YouTube_API {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return $response;
+			// Network-level failure (DNS, timeout, SSL, etc.) — almost always transient.
+			return new \WP_Error(
+				'youtube_network_error',
+				'Could not reach YouTube. This is usually temporary — the next scheduled sync will try again. (' . $response->get_error_message() . ')'
+			);
 		}
 
-		$status = wp_remote_retrieve_response_code( $response );
-		$body   = wp_remote_retrieve_body( $response );
+		$status  = wp_remote_retrieve_response_code( $response );
+		$body    = wp_remote_retrieve_body( $response );
 		$decoded = json_decode( $body, true );
 
-		if ( $status !== 200 ) {
-			$message = $decoded['error']['message'] ?? "YouTube API returned HTTP {$status}.";
-			$reason  = $decoded['error']['errors'][0]['reason'] ?? 'unknown';
+		if ( 200 !== $status ) {
+			$api_message = $decoded['error']['message'] ?? '';
+			$reason      = $decoded['error']['errors'][0]['reason'] ?? '';
+
+			$message = $this->friendly_error_message( $status, $reason, $api_message );
 			return new \WP_Error( 'youtube_api_error', $message, array( 'status' => $status, 'reason' => $reason ) );
 		}
 
 		if ( ! is_array( $decoded ) ) {
-			return new \WP_Error( 'youtube_api_json_error', 'Failed to decode YouTube API response.' );
+			return new \WP_Error(
+				'youtube_api_json_error',
+				'YouTube returned an unexpected response. This is usually temporary — the next scheduled sync will try again.'
+			);
 		}
 
 		return $decoded;
+	}
+
+	/**
+	 * Return a plain-language error message based on HTTP status and API reason code.
+	 *
+	 * Distinguishes between errors the user can fix (bad API key, wrong ID) and
+	 * temporary ones that will likely resolve on the next sync attempt.
+	 *
+	 * @param int    $status     HTTP status code.
+	 * @param string $reason     YouTube API reason code (e.g. 'quotaExceeded').
+	 * @param string $api_message Raw message from the API response.
+	 * @return string Human-readable error message.
+	 */
+	private function friendly_error_message( int $status, string $reason, string $api_message ): string {
+		// Quota exceeded — permanent until midnight Pacific, but not a config error.
+		if ( in_array( $reason, array( 'quotaExceeded', 'dailyLimitExceeded' ), true ) ) {
+			return 'YouTube API daily quota exceeded. Syncing will automatically resume on the next scheduled run tomorrow.';
+		}
+
+		switch ( $status ) {
+			case 400:
+				return 'YouTube rejected the request. This may indicate an invalid Channel ID or Playlist ID — please double-check your settings.';
+
+			case 401:
+				return 'YouTube API authentication failed. Please check your API key in YouSync → Settings.';
+
+			case 403:
+				if ( in_array( $reason, array( 'keyInvalid', 'accessNotConfigured', 'forbidden' ), true ) ) {
+					return 'YouTube API access denied. Your API key may be invalid or the YouTube Data API v3 may not be enabled for it. Check YouSync → Settings.';
+				}
+				return 'YouTube API returned a "Forbidden" error. Check your API key in YouSync → Settings.';
+
+			case 404:
+				return 'YouTube could not find the requested channel or playlist. Please verify your Channel ID or Playlist ID.';
+
+			case 429:
+				return 'Too many requests sent to YouTube. This is temporary — the next scheduled sync will try again.';
+
+			case 500:
+			case 502:
+			case 503:
+			case 504:
+				return "YouTube's servers are temporarily unavailable (HTTP {$status}). This is temporary — the next scheduled sync will try again.";
+
+			default:
+				$detail = $api_message ?: "HTTP {$status}";
+				return "YouTube API returned an unexpected error ({$detail}). The next scheduled sync will try again.";
+		}
 	}
 
 	/**

@@ -21,10 +21,17 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return void
  */
 function yousync_add_logs_submenu(): void {
+	$count      = count( Sync_Logger::get_log() );
+	$menu_title = __( 'Logs', 'yousync' );
+
+	if ( $count > 0 ) {
+		$menu_title .= ' <span class="awaiting-mod"><span class="pending-count">' . $count . '</span></span>';
+	}
+
 	add_submenu_page(
 		'edit.php?post_type=yousync_videos',
 		__( 'YouSync Logs', 'yousync' ),
-		__( 'Logs', 'yousync' ),
+		$menu_title,
 		'manage_options',
 		'yousync_logs',
 		__NAMESPACE__ . '\yousync_render_logs_page'
@@ -35,8 +42,7 @@ add_action( 'admin_menu', __NAMESPACE__ . '\yousync_add_logs_submenu', 20 );
 /**
  * Render the Logs admin page.
  *
- * Handles the "Clear All Logs" POST action and displays the error log table
- * with an optional source-type filter.
+ * Handles the "Clear All Logs" POST action and displays the error log table.
  *
  * @return void
  */
@@ -58,19 +64,7 @@ function yousync_render_logs_page(): void {
 		$cleared = true;
 	}
 
-	// Retrieve and optionally filter the log.
 	$log         = Sync_Logger::get_log();
-	$filter_type = isset( $_GET['source_type'] ) ? sanitize_key( $_GET['source_type'] ) : '';
-
-	if ( $filter_type && in_array( $filter_type, array( 'channel', 'playlist' ), true ) ) {
-		$log = array_values(
-			array_filter(
-				$log,
-				static fn( array $e ) => ( $e['source_type'] ?? '' ) === $filter_type
-			)
-		);
-	}
-
 	$date_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
 	?>
 	<div class="wrap">
@@ -82,25 +76,14 @@ function yousync_render_logs_page(): void {
 		</div>
 		<?php endif; ?>
 
-		<div style="display:flex; align-items:center; justify-content:space-between; margin:16px 0 12px;">
-			<form method="get" style="margin:0;">
-				<input type="hidden" name="page" value="yousync_logs">
-				<label for="yousync_logs_filter" class="screen-reader-text"><?php esc_html_e( 'Filter by Source', 'yousync' ); ?></label>
-				<select id="yousync_logs_filter" name="source_type">
-					<option value=""><?php esc_html_e( 'All Sources', 'yousync' ); ?></option>
-					<option value="channel" <?php selected( $filter_type, 'channel' ); ?>><?php esc_html_e( 'Channels', 'yousync' ); ?></option>
-					<option value="playlist" <?php selected( $filter_type, 'playlist' ); ?>><?php esc_html_e( 'Playlists', 'yousync' ); ?></option>
-				</select>
-				<?php submit_button( __( 'Filter', 'yousync' ), 'secondary', '', false ); ?>
-			</form>
-
-			<?php if ( ! empty( Sync_Logger::get_log() ) ) : ?>
+		<?php if ( ! empty( $log ) ) : ?>
+		<div style="margin:16px 0 12px; text-align:right;">
 			<form method="post" style="margin:0;">
 				<?php wp_nonce_field( 'yousync_clear_logs', 'yousync_clear_logs_nonce' ); ?>
 				<?php submit_button( __( 'Clear All Logs', 'yousync' ), 'delete', '', false ); ?>
 			</form>
-			<?php endif; ?>
 		</div>
+		<?php endif; ?>
 
 		<?php if ( empty( $log ) ) : ?>
 		<p><?php esc_html_e( 'No errors logged.', 'yousync' ); ?></p>

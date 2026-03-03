@@ -2,8 +2,10 @@
 /**
  * Video importer.
  *
- * Creates yousync_videos posts from normalised YouTube video data,
- * downloads thumbnails as media attachments, and assigns taxonomies.
+ * Creates and updates yousync_videos posts from normalised YouTube video data.
+ * Thumbnails are stored as YouTube CDN URLs — no sideloading, no disk usage.
+ * The post_thumbnail_html filter in yousync.php serves the YouTube URL when
+ * no featured image is explicitly set by the user.
  *
  * @package YouSync
  */
@@ -18,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class Video_Importer
  *
- * Handles creation of yousync_videos posts from YouTube API data.
+ * Handles creation and updating of yousync_videos posts.
  */
 class Video_Importer {
 
@@ -62,10 +64,10 @@ class Video_Importer {
 	 *
 	 * Assumes the caller has already confirmed the video does not exist.
 	 *
-	 * @param array  $video_data      Normalised video data from YouTube_API::get_videos_by_ids().
-	 * @param string $source_type     'channel' or 'playlist'.
-	 * @param int    $source_term_id  WordPress term ID of the source channel/playlist.
-	 * @return int|WP_Error Post ID on success, WP_Error on failure.
+	 * @param array  $video_data     Normalised video data from YouTube_API::get_videos_by_ids().
+	 * @param string $source_type    'channel' or 'playlist'.
+	 * @param int    $source_term_id WordPress term ID of the source channel/playlist.
+	 * @return int|\WP_Error Post ID on success, WP_Error on failure.
 	 */
 	public function import( array $video_data, string $source_type, int $source_term_id ): int|\WP_Error {
 		// 1. Create the post.
@@ -93,30 +95,16 @@ class Video_Importer {
 			$this->assign_video_category( $post_id, $video_data['category_id'] );
 		}
 
-		// 4. Download and attach thumbnails.
-		$thumbnail_ids = array();
-		if ( ! empty( $video_data['thumbnails'] ) ) {
-			$thumbnail_ids = $this->download_and_attach_thumbnails(
-				$post_id,
-				$video_data['thumbnails'],
-				$video_data['title']
-			);
-		}
+		// 4. Assign the source channel or playlist term.
+		$this->assign_source_term( $post_id, $source_type, $source_term_id );
 
-		// 5. Build and save JSON meta.
-		$largest_thumb_id = $this->get_largest_thumbnail_id( $thumbnail_ids );
-		$meta             = $this->build_video_meta(
-			$video_data,
-			$source_type,
-			$source_term_id,
-			array(),          // No existing meta on first import.
-			$thumbnail_ids,
-			$largest_thumb_id
-		);
-		update_post_meta( $post_id, '_yousync_video', wp_json_encode( $meta ) );
+		// 5. Build and save JSON meta (thumbnail URLs stored directly, no sideloading).
+		$meta = $this->build_video_meta( $video_data, $source_type, $source_term_id, array() );
+		update_post_meta( $post_id, '_yousync_video', wp_slash( wp_json_encode( $meta ) ) );
 
-		// 6. Save flat video_id meta for fast indexed lookups.
+		// 6. Save flat meta keys for indexed lookups and meta_query filtering.
 		update_post_meta( $post_id, '_yousync_video_id', $video_data['video_id'] );
+		$this->save_flat_meta( $post_id, $video_data );
 
 		return $post_id;
 	}
@@ -153,18 +141,18 @@ class Video_Importer {
 	 * Update an existing yousync_videos post with fresh YouTube data.
 	 *
 	 * Modes:
-	 *   update_all                  — Update everything (title, content, meta, thumbnails, taxonomies).
-	 *   update_non_modified         — Same but skips posts where manual_edits = true.
-	 *   update_specific_all         — Only update fields listed in $specific_metadata.
+	 *   update_all                   — Update everything (title, content, meta, taxonomies).
+	 *   update_non_modified          — Same but skips posts where manual_edits = true.
+	 *   update_specific_all          — Only update fields listed in $specific_metadata.
 	 *   update_specific_non_modified — Same but skips posts where manual_edits = true.
 	 *
 	 * @param int      $post_id           Existing post ID.
 	 * @param array    $video_data        Fresh normalised video data from the API.
 	 * @param string   $mode              One of the four mode strings above.
 	 * @param string[] $specific_metadata Fields to update (used in update_specific_* modes).
-	 * @return true|WP_Error True on success.
+	 * @return true|\WP_Error True on success.
 	 */
-	public function update( int $post_id, array $video_data, string $mode, array $specific_metadata = [] ): bool|\WP_Error {
+	public function update( int $post_id, array $video_data, string $mode, array $specific_metadata = array() ): bool|\WP_Error {
 		// Load existing meta.
 		$raw           = get_post_meta( $post_id, '_yousync_video', true );
 		$existing_meta = is_string( $raw ) ? ( json_decode( $raw, true ) ?: array() ) : array();
@@ -180,7 +168,7 @@ class Video_Importer {
 			return true;
 		}
 
-		// Full update: title, content, taxonomies, thumbnails, meta.
+		// Full update: title, content, taxonomies, meta.
 		wp_update_post(
 			array(
 				'ID'           => $post_id,
@@ -197,24 +185,18 @@ class Video_Importer {
 			$this->assign_video_category( $post_id, $video_data['category_id'] );
 		}
 
-		$thumbnail_ids = array();
-		if ( ! empty( $video_data['thumbnails'] ) ) {
-			$thumbnail_ids = $this->download_and_attach_thumbnails( $post_id, $video_data['thumbnails'], $video_data['title'] );
-		}
+		$this->assign_source_term( $post_id, $existing_meta['sync_source_type'] ?? '', (int) ( $existing_meta['sync_source_id'] ?? 0 ) );
 
-		$featured_id = $this->get_largest_thumbnail_id( $thumbnail_ids );
-		$meta        = $this->build_video_meta(
+		$meta                 = $this->build_video_meta(
 			$video_data,
 			$existing_meta['sync_source_type'] ?? '',
 			(int) ( $existing_meta['sync_source_id'] ?? 0 ),
-			$existing_meta,
-			$thumbnail_ids,
-			$featured_id
+			$existing_meta
 		);
-		// Preserve manual_edits flag — never overwrite it during an update.
 		$meta['manual_edits'] = $manual_edits;
 
-		update_post_meta( $post_id, '_yousync_video', wp_json_encode( $meta ) );
+		update_post_meta( $post_id, '_yousync_video', wp_slash( wp_json_encode( $meta ) ) );
+		$this->save_flat_meta( $post_id, $video_data );
 
 		return true;
 	}
@@ -244,21 +226,27 @@ class Video_Importer {
 		foreach ( $specific_metadata as $field ) {
 			switch ( $field ) {
 				case 'title':
-					$post_update['post_title']   = sanitize_text_field( $video_data['title'] );
-					$meta['original_title']      = $video_data['title'];
+					$post_update['post_title'] = sanitize_text_field( $video_data['title'] );
+					$meta['original_title']    = $video_data['title'];
 					break;
 
 				case 'description':
-					$post_update['post_content']      = wp_kses_post( $video_data['description'] );
-					$meta['original_description']     = $video_data['description'];
+					$post_update['post_content']  = wp_kses_post( $video_data['description'] );
+					$meta['original_description'] = $video_data['description'];
 					break;
 
 				case 'thumbnail':
+					// Refresh thumbnail URLs from the latest API data (no sideloading).
 					if ( ! empty( $video_data['thumbnails'] ) ) {
-						$thumb_ids             = $this->download_and_attach_thumbnails( $post_id, $video_data['thumbnails'], $video_data['title'] );
-						$featured_id           = $this->get_largest_thumbnail_id( $thumb_ids );
-						$meta['thumbnails']    = $this->merge_thumbnail_ids( $video_data['thumbnails'], $thumb_ids );
-						$meta['thumbnail_attachment_id'] = $featured_id;
+						$thumbnails = array();
+						foreach ( $video_data['thumbnails'] as $size => $thumb ) {
+							$thumbnails[ $size ] = array(
+								'url'    => $thumb['url'],
+								'width'  => $thumb['width'],
+								'height' => $thumb['height'],
+							);
+						}
+						$meta['thumbnails'] = $thumbnails;
 					}
 					break;
 
@@ -276,27 +264,31 @@ class Video_Importer {
 
 				case 'duration':
 					$meta['duration_seconds'] = $video_data['duration_seconds'];
+					update_post_meta( $post_id, '_yousync_duration_seconds', (int) $video_data['duration_seconds'] );
 					break;
 
 				case 'view_count':
 					$meta['view_count'] = $video_data['view_count'];
+					update_post_meta( $post_id, '_yousync_view_count', (int) $video_data['view_count'] );
 					break;
 
 				case 'like_count':
 					$meta['like_count'] = $video_data['like_count'];
+					update_post_meta( $post_id, '_yousync_like_count', (int) $video_data['like_count'] );
 					break;
 
 				case 'comment_count':
 					$meta['comment_count'] = $video_data['comment_count'];
+					update_post_meta( $post_id, '_yousync_comment_count', (int) $video_data['comment_count'] );
 					break;
 
 				case 'published_date':
 					$meta['published_date'] = $video_data['published_at'];
+					update_post_meta( $post_id, '_yousync_published_at', $video_data['published_at'] );
 					break;
 			}
 		}
 
-		// Flush post fields if any need updating.
 		if ( count( $post_update ) > 1 ) {
 			wp_update_post( $post_update );
 		}
@@ -304,27 +296,40 @@ class Video_Importer {
 		$meta['last_synced'] = time();
 		$meta['sync_count']  = (int) ( $meta['sync_count'] ?? 0 ) + 1;
 
-		update_post_meta( $post_id, '_yousync_video', wp_json_encode( $meta ) );
+		update_post_meta( $post_id, '_yousync_video', wp_slash( wp_json_encode( $meta ) ) );
 	}
 
 	/**
-	 * Merge fresh thumbnail attachment IDs into the thumbnails array shape.
+	 * Assign the source channel or playlist taxonomy term to a post.
 	 *
-	 * @param array $thumbnails  Raw thumbnails from video_data.
-	 * @param array $thumb_ids   Map of [ size => attachment_id ] from download.
-	 * @return array Merged thumbnails array.
+	 * Allows videos to be queried/filtered by the channel or playlist they
+	 * were synced from using standard WordPress taxonomy queries.
+	 *
+	 * @param int    $post_id      Post ID.
+	 * @param string $source_type  'channel' or 'playlist'.
+	 * @param int    $source_term_id WordPress term ID of the source.
+	 * @return void
 	 */
-	private function merge_thumbnail_ids( array $thumbnails, array $thumb_ids ): array {
-		$merged = array();
-		foreach ( $thumbnails as $size => $thumb ) {
-			$merged[ $size ] = array(
-				'url'           => $thumb['url'],
-				'width'         => $thumb['width'],
-				'height'        => $thumb['height'],
-				'attachment_id' => $thumb_ids[ $size ] ?? 0,
-			);
+	public function assign_term( int $post_id, string $source_type, int $source_term_id ): void {
+		$this->assign_source_term( $post_id, $source_type, $source_term_id );
+	}
+
+	private function assign_source_term( int $post_id, string $source_type, int $source_term_id ): void {
+		if ( ! $source_term_id ) {
+			return;
 		}
-		return $merged;
+
+		if ( 'playlist' === $source_type ) {
+			wp_set_object_terms( $post_id, $source_term_id, 'yousync_playlist' );
+
+			// Also assign the channel that owns this playlist.
+			$channel_term_id = (int) get_term_meta( $source_term_id, 'yousync_source_channel_term_id', true );
+			if ( $channel_term_id ) {
+				wp_set_object_terms( $post_id, $channel_term_id, 'yousync_channel' );
+			}
+		} else {
+			wp_set_object_terms( $post_id, $source_term_id, 'yousync_channel' );
+		}
 	}
 
 	/**
@@ -353,7 +358,6 @@ class Video_Importer {
 	private function assign_video_category( int $post_id, string $category_id ): void {
 		$term_name = self::YOUTUBE_CATEGORIES[ $category_id ] ?? "Category {$category_id}";
 
-		// Get or create the term.
 		$term = get_term_by( 'slug', $category_id, 'video_category' );
 
 		if ( ! $term ) {
@@ -370,127 +374,28 @@ class Video_Importer {
 	}
 
 	/**
-	 * Download all YouTube thumbnails and attach them to the post.
-	 *
-	 * Skips sizes already downloaded (identified by _yousync_thumbnail_source_url
-	 * attachment meta). Sets the largest available thumbnail as the featured image.
-	 *
-	 * @param int    $post_id    Post ID to attach thumbnails to.
-	 * @param array  $thumbnails Thumbnails array from video data (size => { url, width, height }).
-	 * @param string $title      Video title used as attachment title.
-	 * @return array Map of [ size => attachment_id ] for sizes that were downloaded.
-	 */
-	private function download_and_attach_thumbnails( int $post_id, array $thumbnails, string $title ): array {
-		$this->require_media_functions();
-
-		$attachment_ids = array();
-
-		foreach ( self::THUMBNAIL_SIZE_PRIORITY as $size ) {
-			if ( empty( $thumbnails[ $size ]['url'] ) ) {
-				continue;
-			}
-
-			$url = $thumbnails[ $size ]['url'];
-
-			// Check if this thumbnail has already been downloaded.
-			$existing = get_posts(
-				array(
-					'post_type'      => 'attachment',
-					'post_parent'    => $post_id,
-					'posts_per_page' => 1,
-					'fields'         => 'ids',
-					'no_found_rows'  => true,
-					'meta_query'     => array(
-						array(
-							'key'   => '_yousync_thumbnail_source_url',
-							'value' => $url,
-						),
-					),
-				)
-			);
-
-			if ( ! empty( $existing ) ) {
-				$attachment_ids[ $size ] = (int) $existing[0];
-				continue;
-			}
-
-			// Download and attach.
-			$attachment_id = media_sideload_image(
-				$url,
-				$post_id,
-				"{$title} — {$size}",
-				'id'
-			);
-
-			if ( is_wp_error( $attachment_id ) ) {
-				// Log but don't abort — other sizes may succeed.
-				continue;
-			}
-
-			update_post_meta( $attachment_id, '_yousync_thumbnail_source_url', $url );
-
-			// Store width and height in attachment meta.
-			if ( ! empty( $thumbnails[ $size ]['width'] ) ) {
-				update_post_meta( $attachment_id, '_yousync_thumbnail_width', (int) $thumbnails[ $size ]['width'] );
-				update_post_meta( $attachment_id, '_yousync_thumbnail_height', (int) $thumbnails[ $size ]['height'] );
-			}
-
-			$attachment_ids[ $size ] = $attachment_id;
-		}
-
-		// Set the featured image to the largest downloaded thumbnail.
-		$featured_id = $this->get_largest_thumbnail_id( $attachment_ids );
-		if ( $featured_id ) {
-			set_post_thumbnail( $post_id, $featured_id );
-		}
-
-		return $attachment_ids;
-	}
-
-	/**
-	 * Get the attachment ID for the largest thumbnail size available.
-	 *
-	 * Iterates THUMBNAIL_SIZE_PRIORITY (largest first) and returns the first hit.
-	 *
-	 * @param array $thumbnail_ids Map of [ size => attachment_id ].
-	 * @return int Attachment ID, or 0 if none found.
-	 */
-	private function get_largest_thumbnail_id( array $thumbnail_ids ): int {
-		foreach ( self::THUMBNAIL_SIZE_PRIORITY as $size ) {
-			if ( ! empty( $thumbnail_ids[ $size ] ) ) {
-				return (int) $thumbnail_ids[ $size ];
-			}
-		}
-		return 0;
-	}
-
-	/**
 	 * Build the _yousync_video meta array from video data.
 	 *
-	 * @param array  $video_data      Normalised video data.
-	 * @param string $source_type     'channel' or 'playlist'.
-	 * @param int    $source_term_id  WordPress term ID of the source.
-	 * @param array  $existing_meta   Existing meta (used to preserve fields on update).
-	 * @param array  $thumbnail_ids   Map of [ size => attachment_id ].
-	 * @param int    $featured_id     Attachment ID of the featured image.
+	 * Thumbnails are stored as URL + dimensions only — no attachment IDs.
+	 *
+	 * @param array  $video_data     Normalised video data.
+	 * @param string $source_type    'channel' or 'playlist'.
+	 * @param int    $source_term_id WordPress term ID of the source.
+	 * @param array  $existing_meta  Existing meta (used to preserve fields on update).
 	 * @return array Complete meta array ready for wp_json_encode.
 	 */
 	private function build_video_meta(
 		array $video_data,
 		string $source_type,
 		int $source_term_id,
-		array $existing_meta,
-		array $thumbnail_ids,
-		int $featured_id
+		array $existing_meta
 	): array {
-		// Build thumbnails sub-array with attachment IDs merged in.
 		$thumbnails = array();
-		foreach ( $video_data['thumbnails'] as $size => $thumb ) {
+		foreach ( $video_data['thumbnails'] ?? array() as $size => $thumb ) {
 			$thumbnails[ $size ] = array(
-				'url'           => $thumb['url'],
-				'width'         => $thumb['width'],
-				'height'        => $thumb['height'],
-				'attachment_id' => $thumbnail_ids[ $size ] ?? 0,
+				'url'    => $thumb['url'],
+				'width'  => $thumb['width'],
+				'height' => $thumb['height'],
 			);
 		}
 
@@ -513,7 +418,6 @@ class Video_Importer {
 			'like_count'           => $video_data['like_count'],
 			'comment_count'        => $video_data['comment_count'],
 			'thumbnails'           => $thumbnails,
-			'thumbnail_attachment_id' => $featured_id,
 			'manual_edits'         => $existing_meta['manual_edits'] ?? false,
 			'last_synced'          => $now,
 			'last_modified'        => $now,
@@ -523,17 +427,39 @@ class Video_Importer {
 	}
 
 	/**
-	 * Require WordPress media functions used by media_sideload_image().
+	 * Write flat meta keys for the queryable video fields.
 	 *
-	 * These are admin-only files and must be loaded manually in non-admin context.
+	 * These mirror specific values already stored in _yousync_video JSON so
+	 * that developers can use standard WP_Query meta_query filters on them
+	 * without parsing JSON.
 	 *
+	 * @param int   $post_id    Post ID.
+	 * @param array $video_data Normalised video data from YouTube_API::get_videos_by_ids().
 	 * @return void
 	 */
-	private function require_media_functions(): void {
-		if ( ! function_exists( 'media_sideload_image' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/media.php';
-			require_once ABSPATH . 'wp-admin/includes/file.php';
-			require_once ABSPATH . 'wp-admin/includes/image.php';
+	private function save_flat_meta( int $post_id, array $video_data ): void {
+		update_post_meta( $post_id, '_yousync_view_count', (int) ( $video_data['view_count'] ?? 0 ) );
+		update_post_meta( $post_id, '_yousync_like_count', (int) ( $video_data['like_count'] ?? 0 ) );
+		update_post_meta( $post_id, '_yousync_comment_count', (int) ( $video_data['comment_count'] ?? 0 ) );
+		update_post_meta( $post_id, '_yousync_duration_seconds', (int) ( $video_data['duration_seconds'] ?? 0 ) );
+		update_post_meta( $post_id, '_yousync_published_at', $video_data['published_at'] ?? '' );
+		update_post_meta( $post_id, '_yousync_channel_id', $video_data['channel_id'] ?? '' );
+	}
+
+	/**
+	 * Get the URL of the largest available thumbnail.
+	 *
+	 * Used by the post_thumbnail_html filter in yousync.php.
+	 *
+	 * @param array $thumbnails Thumbnails array from _yousync_video meta.
+	 * @return array|null Thumbnail array (url, width, height) or null if none found.
+	 */
+	public static function get_best_thumbnail( array $thumbnails ): ?array {
+		foreach ( self::THUMBNAIL_SIZE_PRIORITY as $size ) {
+			if ( ! empty( $thumbnails[ $size ]['url'] ) ) {
+				return $thumbnails[ $size ];
+			}
 		}
+		return null;
 	}
 }

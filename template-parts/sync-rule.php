@@ -14,6 +14,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+$term_id    = isset( $term_id ) ? (int) $term_id : 0;
+$source_type = isset( $source_type ) ? $source_type : 'channel';
 $enabled         = isset( $rule['enabled'] ) ? $rule['enabled'] : true;
 $schedule        = isset( $rule['schedule'] ) ? $rule['schedule'] : 'daily';
 $custom_schedule = isset( $rule['custom_schedule'] ) ? $rule['custom_schedule'] : 1;
@@ -177,6 +179,63 @@ $field_options_tpl = $resource ? yousync_return_template_part( 'options', $resou
 				?>
 			</div>
 		</fieldset>
+
+	<?php
+	$rule_sync_status = $rule['sync_status'] ?? '';
+	$rule_last_synced = (int) ( $rule['last_synced'] ?? 0 );
+	$rule_sync_errors = is_array( $rule['sync_errors'] ?? null ) ? $rule['sync_errors'] : array();
+	$rule_next_run    = ( $term_id && '{{INDEX}}' !== $rule_index )
+		? wp_next_scheduled( 'yousync_sync_rule', array( $source_type, $term_id, (int) $rule_index ) )
+		: false;
+	if ( $rule_sync_status || $rule_last_synced || $rule_next_run ) :
+		$status_colors = array(
+			'success' => '#00a32a',
+			'failed'  => '#d63638',
+		);
+	?>
+	<div class="ys-rule-history ys-mt-3">
+		<?php if ( $rule_sync_status ) : ?>
+		<p class="ys-mb-0">
+			<strong><?php esc_html_e( 'Status:', 'yousync' ); ?></strong>
+			<span style="color:<?php echo esc_attr( $status_colors[ $rule_sync_status ] ?? '#757575' ); ?>; font-weight:600;">
+				<?php echo esc_html( ucfirst( str_replace( '_', ' ', $rule_sync_status ) ) ); ?>
+			</span>
+		</p>
+		<?php endif; ?>
+		<?php if ( $rule_last_synced ) : ?>
+		<p class="ys-mb-0">
+			<strong><?php esc_html_e( 'Last Synced:', 'yousync' ); ?></strong>
+			<?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $rule_last_synced ) ); ?>
+		</p>
+		<?php endif; ?>
+		<?php if ( $rule_next_run ) : ?>
+		<p class="ys-mb-0">
+			<strong><?php esc_html_e( 'Next Run:', 'yousync' ); ?></strong>
+			<?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $rule_next_run ) ); ?>
+		</p>
+		<?php endif; ?>
+	</div>
+	<?php endif; ?>
+
+	<p class="ys-quota-estimate description ys-mb-0"><strong>Estimated Quota:</strong> <span class="ys-quota-value"></span></p>
+
+	<?php if ( ! empty( $rule_sync_errors ) ) : ?>
+	<div class="ys-rule-errors ys-mt-3" style="font-size:12px;">
+		<?php foreach ( $rule_sync_errors as $err ) : ?>
+		<p class="ys-mb-0" style="color:#d63638;">
+			<?php
+			if ( ! empty( $err['timestamp'] ) ) {
+				echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $err['timestamp'] ) ) . ' &mdash; ';
+			}
+			echo esc_html( $err['error'] ?? '' );
+			if ( ! empty( $err['code'] ) ) {
+				echo ' <code>' . esc_html( $err['code'] ) . '</code>';
+			}
+			?>
+		</p>
+		<?php endforeach; ?>
+	</div>
+	<?php endif; ?>
 
 	</div>
 </div>

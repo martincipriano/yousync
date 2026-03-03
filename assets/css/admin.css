@@ -479,4 +479,65 @@
   background-color: #E6F2E8;
 }
 
+/* Channel Hero */
+#ys-channel-hero {
+  box-sizing: border-box;
+  margin-top: 20px;
+  max-width: 783px;
+  opacity: 0;
+  padding-right: 20px;
+  width: 100%;
+}
+
+#ys-channel-hero .ys-hero-inner {
+  position: relative;
+}
+
+#ys-channel-hero .ys-hero-banner {
+  border-radius: 16px;
+  display: block;
+  height: 200px;
+  object-fit: cover;
+  width: 100%;
+}
+
+#ys-channel-hero .ys-hero-banner-placeholder {
+  background: #1d2327;
+  border-radius: 16px;
+  height: 200px;
+  width: 100%;
+}
+
+#ys-channel-hero .ys-hero-profile {
+  left: 20px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+#ys-channel-hero .ys-hero-profile img {
+  border: 3px solid #fff;
+  border-radius: 50%;
+  display: block;
+  height: 110px;
+  object-fit: cover;
+  width: 110px;
+}
+
+@media screen and (max-width: 782px) {
+  #ys-channel-hero {
+    padding-right: 10px;
+  }
+}
+
+/* Thumbnail column */
+.column-yousync_thumbnail {
+  width: 100px;
+}
+
+/* Protected from Sync Rules column */
+.column-yousync_protected {
+  text-align: right;
+}
+
 /*# sourceMappingURL=admin.css.map */

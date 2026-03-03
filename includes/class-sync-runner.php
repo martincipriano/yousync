@@ -24,6 +24,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Sync_Runner {
 
 	/**
+	 * Index of the rule currently being executed.
+	 * Set at the start of run() so record_success/record_error can write to the correct rule.
+	 *
+	 * @var int
+	 */
+	private int $current_rule_index = 0;
+
+	/**
 	 * YouTube API wrapper.
 	 *
 	 * @var YouTube_API
@@ -78,6 +86,8 @@ class Sync_Runner {
 		if ( null === $rule || empty( $rule['enabled'] ) ) {
 			return;
 		}
+
+		$this->current_rule_index = $rule_index;
 
 		$action = $rule['action'] ?? '';
 
@@ -167,6 +177,10 @@ class Sync_Runner {
 				return;
 			}
 
+			// Opportunistically refresh channel metadata (title, subscribers, images, etc.)
+			// while we already have the API response in hand.
+			$this->refresh_channel_meta( $term_id, $channel_data );
+
 			$playlist_id = $channel_data['uploads_playlist_id'] ?? '';
 			if ( empty( $playlist_id ) ) {
 				throw new \RuntimeException( "Could not retrieve uploads playlist ID for channel '{$meta['channel_id']}'." );
@@ -194,9 +208,19 @@ class Sync_Runner {
 		// Extract video IDs from the playlist items.
 		$all_ids = array_filter( array_column( $items, 'video_id' ) );
 
-		// Remove video IDs already imported to avoid duplicates.
+		// Split into new vs already-imported.
 		$existing_ids = $this->get_existing_video_ids();
 		$new_ids      = array_values( array_diff( $all_ids, $existing_ids ) );
+		$existing_ids_here = array_values( array_intersect( $all_ids, $existing_ids ) );
+
+		// Already-imported videos: just assign the source term so the post is
+		// associated with this channel/playlist too (a video can belong to many).
+		foreach ( $existing_ids_here as $video_id ) {
+			$post_id = $this->importer->find_post_by_video_id( $video_id );
+			if ( $post_id ) {
+				$this->importer->assign_term( $post_id, $source_type, $term_id );
+			}
+		}
 
 		if ( empty( $new_ids ) ) {
 			return; // All videos already imported.
@@ -272,6 +296,8 @@ class Sync_Runner {
 			'channel_description' => 'channel_description',
 			'subscriber_count'    => 'subscriber_count',
 			'video_count'         => 'video_count',
+			'profile_picture'     => 'profile_picture',
+			'banner_image'        => 'banner_image',
 		);
 
 		if ( 'channel_update_specific' === $action ) {
@@ -287,7 +313,7 @@ class Sync_Runner {
 		}
 
 		$data['etag'] = $fresh['etag'] ?? $data['etag'];
-		update_term_meta( $term_id, 'yousync_channel', wp_json_encode( $data ) );
+		update_term_meta( $term_id, 'yousync_channel', wp_slash( wp_json_encode( $data ) ) );
 	}
 
 	/**
@@ -415,7 +441,7 @@ class Sync_Runner {
 		}
 
 		$data['etag'] = $fresh['etag'] ?? $data['etag'];
-		update_term_meta( $term_id, 'yousync_playlist', wp_json_encode( $data ) );
+		update_term_meta( $term_id, 'yousync_playlist', wp_slash( wp_json_encode( $data ) ) );
 	}
 
 	/**
@@ -656,7 +682,7 @@ class Sync_Runner {
 			'manual_edits'         => false,
 		);
 
-		update_term_meta( $new_term_id, 'yousync_playlist', wp_json_encode( $meta ) );
+		update_term_meta( $new_term_id, 'yousync_playlist', wp_slash( wp_json_encode( $meta ) ) );
 	}
 
 	/**
@@ -681,7 +707,7 @@ class Sync_Runner {
 			}
 		}
 
-		update_term_meta( $term_id, 'yousync_playlist', wp_json_encode( $current_meta ) );
+		update_term_meta( $term_id, 'yousync_playlist', wp_slash( wp_json_encode( $current_meta ) ) );
 	}
 
 	/**
@@ -713,7 +739,7 @@ class Sync_Runner {
 		}
 
 		$current_meta['etag'] = $fresh['etag'];
-		update_term_meta( $term_id, 'yousync_playlist', wp_json_encode( $current_meta ) );
+		update_term_meta( $term_id, 'yousync_playlist', wp_slash( wp_json_encode( $current_meta ) ) );
 	}
 
 	/**
@@ -799,6 +825,34 @@ class Sync_Runner {
 	}
 
 	/**
+	 * Merge fresh channel API data into the channel's term meta.
+	 *
+	 * Called as a side effect of handle_videos_sync_new() so that channel
+	 * metadata (title, subscribers, profile picture, banner) stays up to date
+	 * even when no explicit channel_update rule has been configured.
+	 *
+	 * @param int   $term_id      Channel term ID.
+	 * @param array $channel_data Data returned by YouTube_API::get_channel_data().
+	 * @return void
+	 */
+	private function refresh_channel_meta( int $term_id, array $channel_data ): void {
+		$data = $this->get_term_meta_data( 'channel', $term_id );
+		if ( ! $data ) {
+			return;
+		}
+
+		$fields = array( 'channel_title', 'channel_description', 'subscriber_count', 'video_count', 'profile_picture', 'banner_image' );
+		foreach ( $fields as $field ) {
+			if ( isset( $channel_data[ $field ] ) ) {
+				$data[ $field ] = $channel_data[ $field ];
+			}
+		}
+
+		$data['etag'] = $channel_data['etag'] ?? ( $data['etag'] ?? '' );
+		update_term_meta( $term_id, 'yousync_channel', wp_slash( wp_json_encode( $data ) ) );
+	}
+
+	/**
 	 * Read and decode the source term's JSON meta.
 	 *
 	 * @param string $source_type 'channel' or 'playlist'.
@@ -843,16 +897,18 @@ class Sync_Runner {
 	 */
 	private function record_success( string $source_type, int $term_id ): void {
 		$data = $this->get_term_meta_data( $source_type, $term_id );
-		if ( ! $data ) {
+		if ( ! $data || ! isset( $data['sync_rules'][ $this->current_rule_index ] ) ) {
 			return;
 		}
 
-		$data['last_synced']  = time();
-		$data['sync_count']   = (int) ( $data['sync_count'] ?? 0 ) + 1;
-		$data['sync_status']  = 'success';
-		$data['sync_errors']  = array();
+		$rule                = &$data['sync_rules'][ $this->current_rule_index ];
+		$rule['last_synced'] = time();
+		$rule['sync_count']  = (int) ( $rule['sync_count'] ?? 0 ) + 1;
+		$rule['sync_status'] = 'success';
+		$rule['sync_errors'] = array();
+		unset( $rule );
 
-		update_term_meta( $term_id, $this->meta_key( $source_type ), wp_json_encode( $data ) );
+		update_term_meta( $term_id, $this->meta_key( $source_type ), wp_slash( wp_json_encode( $data ) ) );
 	}
 
 	/**
@@ -870,9 +926,9 @@ class Sync_Runner {
 		// Write to the global error log (single option, capped at 50 entries).
 		Sync_Logger::log_error( $source_type, $term_id, $error, $code );
 
-		// Also store the last 5 errors in term meta for quick display on the edit page.
+		// Also store the last 5 errors in the specific rule's meta for quick display.
 		$data = $this->get_term_meta_data( $source_type, $term_id );
-		if ( ! $data ) {
+		if ( ! $data || ! isset( $data['sync_rules'][ $this->current_rule_index ] ) ) {
 			return;
 		}
 
@@ -882,12 +938,14 @@ class Sync_Runner {
 			'code'      => $code,
 		);
 
-		$errors              = $data['sync_errors'] ?? array();
+		$rule                = &$data['sync_rules'][ $this->current_rule_index ];
+		$errors              = $rule['sync_errors'] ?? array();
 		$errors[]            = $entry;
-		$data['sync_errors'] = array_slice( $errors, -5 ); // Keep max 5.
-		$data['sync_status'] = 'failed';
+		$rule['sync_errors'] = array_slice( $errors, -5 );
+		$rule['sync_status'] = 'failed';
+		unset( $rule );
 
-		update_term_meta( $term_id, $this->meta_key( $source_type ), wp_json_encode( $data ) );
+		update_term_meta( $term_id, $this->meta_key( $source_type ), wp_slash( wp_json_encode( $data ) ) );
 	}
 
 	/**
@@ -908,6 +966,6 @@ class Sync_Runner {
 		}
 
 		$data['sync_rules'][ $rule_index ]['enabled'] = false;
-		update_term_meta( $term_id, $this->meta_key( $source_type ), wp_json_encode( $data ) );
+		update_term_meta( $term_id, $this->meta_key( $source_type ), wp_slash( wp_json_encode( $data ) ) );
 	}
 }

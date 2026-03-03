@@ -429,6 +429,62 @@ syncRules.addEventListener('click', function(e) {
 })
 
 /**
+ * Calculate and display estimated YouTube API quota cost for a sync rule.
+ */
+function updateQuotaEstimate(rule) {
+	const el       = rule.querySelector('.ys-quota-value')
+	if (!el) return
+
+	const action       = rule.querySelector('.ys-action')?.value || ''
+	const schedule     = rule.querySelector('.ys-sync-schedule')?.value || ''
+	const customHours  = parseInt(rule.querySelector('.ys-custom-sync-schedule')?.value) || 24
+	const videoCount   = parseInt(syncRules.dataset.videoCount) || 0
+
+	const videoActions    = ['videos_sync_new', 'videos_update_all', 'videos_update_non_modified', 'videos_update_specific_all', 'videos_update_specific_non_modified']
+	const cheapActions    = ['channel_update_all', 'channel_update_specific', 'playlist_update_all', 'playlist_update_specific']
+	const playlistsActions = ['playlists_sync_new', 'playlists_update_all', 'playlists_update_non_modified', 'playlists_update_specific_all', 'playlists_update_specific_non_modified']
+
+	let perRun = null
+	let text   = ''
+
+	if (videoActions.includes(action)) {
+		const batches = Math.ceil(Math.max(1, videoCount) / 50)
+		perRun = 1 + batches * 2
+	} else if (cheapActions.includes(action)) {
+		perRun = 1
+	} else if (playlistsActions.includes(action)) {
+		el.textContent = '~1 unit per 50 playlists'
+		return
+	} else {
+		el.textContent = ''
+		return
+	}
+
+	text = `~${perRun} unit${perRun !== 1 ? 's' : ''} per run`
+
+	const multipliers = { hourly: 24, daily: 1, weekly: 1/7, monthly: 1/30 }
+	let runsPerDay = schedule === 'custom' ? 24 / customHours : (multipliers[schedule] ?? null)
+
+	if (runsPerDay && runsPerDay >= 1) {
+		text += ` · ~${Math.round(perRun * runsPerDay)} units/day`
+	}
+
+	el.textContent = text
+}
+
+syncRules.querySelectorAll('.ys-sync-rule').forEach(updateQuotaEstimate)
+
+syncRules.addEventListener('change', function(e) {
+	if (
+		e.target.classList.contains('ys-action') ||
+		e.target.classList.contains('ys-sync-schedule') ||
+		e.target.classList.contains('ys-custom-sync-schedule')
+	) {
+		updateQuotaEstimate(e.target.closest('.ys-sync-rule'))
+	}
+})
+
+/**
  * Initialize TomSelect for specific metadata selects that were pre-populated
  * server-side when loading existing sync rules with update_specific actions.
  */

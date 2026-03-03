@@ -107,14 +107,10 @@ class Playlist {
 			$data = array();
 		}
 
-		$playlist_id          = isset( $data['playlist_id'] ) ? $data['playlist_id'] : '';
-		$sync_rules           = isset( $data['sync_rules'] ) ? $data['sync_rules'] : array();
-		$playlist_title       = isset( $data['playlist_title'] ) ? $data['playlist_title'] : '';
-		$playlist_description = isset( $data['playlist_description'] ) ? $data['playlist_description'] : '';
-		$playlist_video_count = isset( $data['playlist_video_count'] ) ? $data['playlist_video_count'] : '';
-		$playlist_thumbnail   = isset( $data['playlist_thumbnail'] ) ? $data['playlist_thumbnail'] : array();
-		$last_synced          = isset( $data['last_synced'] ) ? $data['last_synced'] : '';
-		$sync_count           = isset( $data['sync_count'] ) ? $data['sync_count'] : 0;
+		$playlist_id        = isset( $data['playlist_id'] ) ? $data['playlist_id'] : '';
+		$sync_rules         = isset( $data['sync_rules'] ) ? $data['sync_rules'] : array();
+		$playlist_title     = isset( $data['playlist_title'] ) ? $data['playlist_title'] : '';
+		$playlist_thumbnail = isset( $data['playlist_thumbnail'] ) ? $data['playlist_thumbnail'] : array();
 		?>
 
 		<tr class="form-field term-playlist-id-wrap">
@@ -129,17 +125,12 @@ class Playlist {
 			</td>
 		</tr>
 
+		<?php if ( $playlist_title || ! empty( $playlist_thumbnail ) ) : ?>
+
 		<?php if ( $playlist_title ) : ?>
 		<tr class="form-field">
 			<th scope="row"><?php esc_html_e( 'Playlist Title', 'yousync' ); ?></th>
-			<td><p><?php echo esc_html( $playlist_title ); ?></p></td>
-		</tr>
-		<?php endif; ?>
-
-		<?php if ( $playlist_description ) : ?>
-		<tr class="form-field">
-			<th scope="row"><?php esc_html_e( 'Description', 'yousync' ); ?></th>
-			<td><p><?php echo esc_html( $playlist_description ); ?></p></td>
+			<td><?php echo esc_html( $playlist_title ); ?></td>
 		</tr>
 		<?php endif; ?>
 
@@ -148,33 +139,13 @@ class Playlist {
 			<th scope="row"><?php esc_html_e( 'Thumbnail', 'yousync' ); ?></th>
 			<td>
 				<?php if ( ! empty( $playlist_thumbnail['attachment_id'] ) ) : ?>
-					<?php echo wp_get_attachment_image( (int) $playlist_thumbnail['attachment_id'], array( 120, 90 ) ); ?>
+					<?php echo wp_get_attachment_image( (int) $playlist_thumbnail['attachment_id'], array( 320, 180 ) ); ?>
 				<?php elseif ( ! empty( $playlist_thumbnail['url'] ) ) : ?>
-					<img src="<?php echo esc_url( $playlist_thumbnail['url'] ); ?>" style="max-width:160px;height:auto;" alt="">
+					<img src="<?php echo esc_url( $playlist_thumbnail['url'] ); ?>" style="max-width:320px; height:auto;" alt="">
 				<?php endif; ?>
 			</td>
 		</tr>
 		<?php endif; ?>
-
-		<?php if ( $playlist_video_count !== '' ) : ?>
-		<tr class="form-field">
-			<th scope="row"><?php esc_html_e( 'Videos', 'yousync' ); ?></th>
-			<td><p><?php echo esc_html( number_format( (int) $playlist_video_count ) ); ?></p></td>
-		</tr>
-		<?php endif; ?>
-
-		<?php if ( $last_synced ) : ?>
-		<tr class="form-field">
-			<th scope="row"><?php esc_html_e( 'Last Synced', 'yousync' ); ?></th>
-			<td><p><?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $last_synced ) ); ?></p></td>
-		</tr>
-		<?php endif; ?>
-
-		<?php if ( $sync_count ) : ?>
-		<tr class="form-field">
-			<th scope="row"><?php esc_html_e( 'Sync Count', 'yousync' ); ?></th>
-			<td><p><?php echo esc_html( $sync_count ); ?></p></td>
-		</tr>
 		<?php endif; ?>
 
 		<tr class="form-field term-sync-rules-wrap">
@@ -182,9 +153,10 @@ class Playlist {
 				<label><?php esc_html_e( 'Sync Rules', 'yousync' ); ?></label>
 			</th>
 			<td>
-				<?php $this->render_sync_rules_section( $sync_rules ); ?>
+				<?php $this->render_sync_rules_section( $sync_rules, $data['playlist_video_count'] ?? 0, $term->term_id ); ?>
 			</td>
 		</tr>
+
 		<?php
 	}
 
@@ -194,16 +166,18 @@ class Playlist {
 	 * @param array $sync_rules Existing sync rules.
 	 * @return void
 	 */
-	private function render_sync_rules_section( $sync_rules = array() ) {
+	private function render_sync_rules_section( $sync_rules = array(), $video_count = 0, $term_id = 0 ) {
 		$html = '';
 		foreach ( $sync_rules as $index => $rule ) {
 			$html .= yousync_return_template_part( 'sync-rule-playlist', null, array(
-				'index' => $index,
-				'rule'  => $rule,
+				'index'       => $index,
+				'rule'        => $rule,
+				'term_id'     => $term_id,
+				'source_type' => 'playlist',
 			) );
 		} ?>
-		<p class="ys-mb-3 ys-mt-4"><strong>Sync Rules</strong> &mdash; <a class="ys-add-rule" href="#" id="ys-add-rule"><?php esc_html_e( 'Add sync rule', 'yousync' ); ?></a></p>
-		<div class="ys-sync-rules" id="ys-sync-rules"><?php echo $html; ?></div>
+		<p class="ys-mb-3"><strong>Sync Rules</strong> &mdash; <a class="ys-add-rule" href="#" id="ys-add-rule"><?php esc_html_e( 'Add sync rule', 'yousync' ); ?></a></p>
+		<div class="ys-sync-rules" id="ys-sync-rules" data-video-count="<?php echo (int) $video_count; ?>"><?php echo $html; ?></div>
 		<?php
 	}
 
@@ -271,18 +245,58 @@ class Playlist {
 		}
 
 		// Update editable fields.
+		$old_playlist_id = $data['playlist_id'] ?? '';
 		if ( isset( $_POST['playlist_id'] ) ) {
 			$data['playlist_id'] = sanitize_text_field( wp_unslash( $_POST['playlist_id'] ) );
 		}
 
+		// If the playlist ID changed or channel link is missing, resolve it from the API.
+		$new_playlist_id = $data['playlist_id'] ?? '';
+		$api_key         = get_option( 'yousync_api_key', '' );
+		if (
+			$api_key &&
+			$new_playlist_id &&
+			( $new_playlist_id !== $old_playlist_id || ! get_term_meta( $term_id, 'yousync_source_channel_term_id', true ) )
+		) {
+			$playlist_data = ( new YouTube_API( $api_key ) )->get_playlist_data( $new_playlist_id );
+			if ( ! is_wp_error( $playlist_data ) && ! empty( $playlist_data['channel_id'] ) ) {
+				$channel_terms = get_terms( array(
+					'taxonomy'   => 'yousync_channel',
+					'hide_empty' => false,
+					'fields'     => 'ids',
+					'meta_query' => array(
+						array(
+							'key'   => 'yousync_channel_id',
+							'value' => $playlist_data['channel_id'],
+						),
+					),
+				) );
+				if ( ! is_wp_error( $channel_terms ) && ! empty( $channel_terms ) ) {
+					update_term_meta( $term_id, 'yousync_source_channel_term_id', (int) $channel_terms[0] );
+				}
+			}
+		}
+
 		// Update sync rules (re-index to ensure sequential keys).
+		$old_rules = $data['sync_rules'] ?? array();
 		if ( isset( $_POST['sync_rules'] ) && is_array( $_POST['sync_rules'] ) ) {
-			$data['sync_rules'] = array_values( array_map( array( $this, 'sanitize_sync_rule' ), $_POST['sync_rules'] ) );
+			$new_rules = array_values( array_map( array( $this, 'sanitize_sync_rule' ), $_POST['sync_rules'] ) );
+			// Restore per-rule status fields not submitted via the form.
+			foreach ( $new_rules as $i => &$new_rule ) {
+				if ( isset( $old_rules[ $i ] ) ) {
+					$new_rule['sync_status'] = $old_rules[ $i ]['sync_status'] ?? '';
+					$new_rule['last_synced'] = $old_rules[ $i ]['last_synced'] ?? 0;
+					$new_rule['sync_count']  = $old_rules[ $i ]['sync_count'] ?? 0;
+					$new_rule['sync_errors'] = $old_rules[ $i ]['sync_errors'] ?? array();
+				}
+			}
+			unset( $new_rule );
+			$data['sync_rules'] = $new_rules;
 		} else {
 			$data['sync_rules'] = array();
 		}
 
-		update_term_meta( $term_id, 'yousync_playlist', wp_json_encode( $data ) );
+		update_term_meta( $term_id, 'yousync_playlist', wp_slash( wp_json_encode( $data ) ) );
 	}
 
 	/**
@@ -331,6 +345,8 @@ class Playlist {
 			'name'        => $columns['name'],
 			'playlist_id' => __( 'Playlist ID', 'yousync' ),
 			'sync_rules'  => __( 'Sync Rules', 'yousync' ),
+			'last_synced' => __( 'Last Synced', 'yousync' ),
+			'sync_count'  => __( 'Videos Synced', 'yousync' ),
 			'posts'       => $columns['posts'],
 		);
 
@@ -367,6 +383,21 @@ class Playlist {
 				} else {
 					$content = __( 'No rules', 'yousync' );
 				}
+				break;
+
+			case 'last_synced':
+				$meta       = get_term_meta( $term_id, 'yousync_playlist', true );
+				$data       = $meta ? json_decode( $meta, true ) : array();
+				$timestamps = array_filter( array_column( $data['sync_rules'] ?? array(), 'last_synced' ) );
+				$last       = $timestamps ? max( $timestamps ) : 0;
+				$content    = $last ? esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $last ) ) : '—';
+				break;
+
+			case 'sync_count':
+				$meta    = get_term_meta( $term_id, 'yousync_playlist', true );
+				$data    = $meta ? json_decode( $meta, true ) : array();
+				$total   = (int) array_sum( array_column( $data['sync_rules'] ?? array(), 'sync_count' ) );
+				$content = (string) $total;
 				break;
 		}
 
