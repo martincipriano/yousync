@@ -212,9 +212,7 @@ $_post_type_label = 'playlists_sync_new' === $action
 					</span>
 				</label>
 				<select class="buoyvs-select" id="buoyvs-post-status-<?php echo esc_attr( $rule_index ); ?>" name="<?php echo esc_attr( $name_prefix ); ?>[<?php echo esc_attr( $rule_index ); ?>][post_status]">
-					<option value="publish" <?php selected( $post_status, 'publish' ); ?>><?php esc_html_e( 'Published', 'buoy-video-sync' ); ?></option>
-					<option value="draft" <?php selected( $post_status, 'draft' ); ?>><?php esc_html_e( 'Draft', 'buoy-video-sync' ); ?></option>
-					<option value="private" <?php selected( $post_status, 'private' ); ?>><?php esc_html_e( 'Private', 'buoy-video-sync' ); ?></option>
+					<?php buoyvs_get_template_part( 'options', 'post-status', array( 'selected' => $post_status ) ); ?>
 				</select>
 			</div>
 		</div>

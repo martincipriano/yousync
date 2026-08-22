@@ -119,9 +119,7 @@ $_public_taxonomies = get_taxonomies( array( 'public' => true ) );
 			<div class="buoyvs-form-group">
 				<label for="buoyvs-wizard-post-status"><?php esc_html_e( 'Post status', 'buoy-video-sync' ); ?></label>
 				<select id="buoyvs-wizard-post-status" class="buoyvs-select buoyvs-wizard-post-status">
-					<option value="publish"><?php esc_html_e( 'Published', 'buoy-video-sync' ); ?></option>
-					<option value="draft"><?php esc_html_e( 'Draft', 'buoy-video-sync' ); ?></option>
-					<option value="private"><?php esc_html_e( 'Private', 'buoy-video-sync' ); ?></option>
+					<?php buoyvs_get_template_part( 'options', 'post-status', array( 'selected' => 'publish' ) ); ?>
 				</select>
 			</div>
 		</div>

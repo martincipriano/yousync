@@ -32,10 +32,20 @@ function buoyvs_valid_schedules(): array {
 /**
  * Valid sync rule post_status values.
  *
+ * Mirrors the exclusions in template-parts/options-post-status.php: every
+ * registered non-internal status except 'future' (requires a future
+ * post_date the sync rule UI doesn't collect), plus any custom status a
+ * theme or plugin registers.
+ *
  * @return string[]
  */
 function buoyvs_valid_post_statuses(): array {
-	return array( 'publish', 'draft', 'private' );
+	$statuses = array_keys( get_post_stati( array( 'internal' => false ) ) );
+	$statuses = array_diff( $statuses, array( 'future' ) );
+	if ( ! in_array( 'publish', $statuses, true ) ) {
+		$statuses[] = 'publish';
+	}
+	return $statuses;
 }
 
 /**
