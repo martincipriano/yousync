@@ -310,6 +310,30 @@ function buoyvs_admin_post_thumbnail_html( string $content, int $post_id, $thumb
 add_filter( 'admin_post_thumbnail_html', 'buoyvs_admin_post_thumbnail_html', 10, 3 );
 
 /**
+ * Label a synced post as a YouTube Video/Playlist/Channel on post list screens.
+ *
+ * Uses the same 'display_post_states' mechanism WordPress uses for "— Draft",
+ * "— Sticky", etc. — a plain-text tag next to the title, no new column. Only
+ * ever adds the content-type label; any other state shown alongside it
+ * (Draft, Sticky, ...) comes from core's own filters on the same array.
+ *
+ * @param string[] $post_states Existing post state labels, keyed by slug.
+ * @param \WP_Post $post        The current row's post.
+ * @return string[] Modified post state labels.
+ */
+function buoyvs_display_post_states( array $post_states, \WP_Post $post ): array {
+	if ( get_post_meta( $post->ID, '_buoyvs_video_id', true ) ) {
+		$post_states['buoyvs_type'] = __( 'YouTube Video', 'buoy-video-sync' );
+	} elseif ( get_post_meta( $post->ID, '_buoyvs_playlist_id', true ) ) {
+		$post_states['buoyvs_type'] = __( 'YouTube Playlist', 'buoy-video-sync' );
+	} elseif ( get_post_meta( $post->ID, '_buoyvs_channel_post', true ) ) {
+		$post_states['buoyvs_type'] = __( 'YouTube Channel', 'buoy-video-sync' );
+	}
+	return $post_states;
+}
+add_filter( 'display_post_states', 'buoyvs_display_post_states', 10, 2 );
+
+/**
  * Add playlist metabox to posts that were synced from a YouTube playlist.
  *
  * @return void
