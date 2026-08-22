@@ -269,6 +269,7 @@ class Sync_Runner {
 	 */
 	private function handle_videos_sync_new( string $source_type, int $term_id, array $rule ): void {
 		$destination_post_type = $rule['destination_post_type'] ?? '';
+		$post_status            = $rule['post_status'] ?? 'publish';
 
 		if ( $this->invalid_destination_post_type( $destination_post_type ) ) {
 			$this->record_error( $source_type, $term_id, $this->invalid_post_type_message( $destination_post_type ), 'invalid_post_type' );
@@ -331,7 +332,7 @@ class Sync_Runner {
 		$max = (int) ( $rule['max_videos'] ?? 0 );
 
 		// Batch-fetch full video details and import.
-		$imported                = $this->batch_fetch_and_import( $new_ids, $source_type, $term_id, $destination_post_type, $max );
+		$imported                = $this->batch_fetch_and_import( $new_ids, $source_type, $term_id, $destination_post_type, $max, $post_status );
 		$this->current_run_count = $imported;
 
 		// Warn when candidates were available but nothing could be saved.
@@ -376,6 +377,7 @@ class Sync_Runner {
 		$channel_id = $data['channel_id'];
 
 		$destination_post_type = $rule['destination_post_type'] ?? '';
+		$post_status            = $rule['post_status'] ?? 'publish';
 
 		if ( $this->invalid_destination_post_type( $destination_post_type ) ) {
 			$this->record_error( 'channel', $term_id, $this->invalid_post_type_message( $destination_post_type ), 'invalid_post_type' );
@@ -395,7 +397,7 @@ class Sync_Runner {
 		}
 
 		$this->write_progress( 0, 1 );
-		$result = $this->importer->import_channel( $fresh, $channel_id, $destination_post_type );
+		$result = $this->importer->import_channel( $fresh, $channel_id, $destination_post_type, $post_status );
 
 		if ( is_wp_error( $result ) ) {
 			$this->accumulate_error( 'channel', $term_id, $result->get_error_message(), $result->get_error_code() );
@@ -419,6 +421,7 @@ class Sync_Runner {
 	 */
 	private function handle_playlists_sync( int $term_id, array $rule, string $action ): void {
 		$destination_post_type = $rule['destination_post_type'] ?? '';
+		$post_status            = $rule['post_status'] ?? 'publish';
 
 		$data = $this->get_channel_data();
 		if ( ! $data || empty( $data['channel_id'] ) ) {
@@ -457,7 +460,7 @@ class Sync_Runner {
 			// Create if missing in this post type.
 			$existing_post_id = $this->importer->find_post_by_playlist_id( $playlist_data['playlist_id'], $destination_post_type );
 			if ( ! $existing_post_id ) {
-				$this->importer->import_playlist( $playlist_data, $channel_id, $destination_post_type );
+				$this->importer->import_playlist( $playlist_data, $channel_id, $destination_post_type, $post_status );
 				++$processed;
 			}
 			++$scanned_pl;
@@ -484,7 +487,8 @@ class Sync_Runner {
 		string $source_type,
 		int $term_id,
 		string $destination_post_type = '',
-		int $max = 0
+		int $max = 0,
+		string $post_status = 'publish'
 	): int {
 		$cap     = $max > 0 ? $max : PHP_INT_MAX;
 		$chunks  = array_chunk( $video_ids, 50 );
@@ -509,7 +513,7 @@ class Sync_Runner {
 					return $imported;
 				}
 
-				$result = $this->importer->import( $video_data, $source_type, $term_id, $destination_post_type );
+				$result = $this->importer->import( $video_data, $source_type, $term_id, $destination_post_type, $post_status );
 
 				if ( is_wp_error( $result ) ) {
 					$this->accumulate_error( $source_type, $term_id, $result->get_error_message(), $result->get_error_code() );

@@ -23,6 +23,7 @@ $name_prefix = isset( $name_prefix ) ? $name_prefix : 'sync_rules';
 $enabled         = isset( $rule['enabled'] ) ? $rule['enabled'] : true;
 $schedule        = isset( $rule['schedule'] ) ? $rule['schedule'] : 'once';
 $custom_schedule = isset( $rule['custom_schedule'] ) ? $rule['custom_schedule'] : 24;
+$post_status     = isset( $rule['post_status'] ) ? $rule['post_status'] : 'publish';
 $action      = isset( $rule['action'] ) ? $rule['action'] : '';
 
 $max_videos            = isset( $rule['max_videos'] ) ? (int) $rule['max_videos'] : 50;
@@ -200,6 +201,20 @@ $_post_type_label = 'playlists_sync_new' === $action
 					<?php foreach ( $post_types as $pt ) : ?>
 					<option value="<?php echo esc_attr( $pt->name ); ?>" data-has-taxonomy="<?php echo array_intersect( get_object_taxonomies( $pt->name ), $_public_taxonomies ) ? '1' : '0'; ?>" <?php selected( $destination_post_type, $pt->name ); ?>><?php echo esc_html( $pt->labels->singular_name ); ?></option>
 					<?php endforeach; ?>
+				</select>
+			</div>
+			<div class="buoyvs-form-group">
+				<label for="buoyvs-post-status-<?php echo esc_attr( $rule_index ); ?>">
+					<?php esc_html_e( 'Post status', 'buoy-video-sync' ); ?>
+					<span class="buoyvs-help-wrap">
+						<button type="button" class="buoyvs-help-btn" aria-label="<?php esc_attr_e( 'More info', 'buoy-video-sync' ); ?>">?</button>
+						<span class="buoyvs-help-tooltip" role="tooltip"><?php esc_html_e( 'The status synced items are saved as. Choose Draft to review before publishing.', 'buoy-video-sync' ); ?></span>
+					</span>
+				</label>
+				<select class="buoyvs-select" id="buoyvs-post-status-<?php echo esc_attr( $rule_index ); ?>" name="<?php echo esc_attr( $name_prefix ); ?>[<?php echo esc_attr( $rule_index ); ?>][post_status]">
+					<option value="publish" <?php selected( $post_status, 'publish' ); ?>><?php esc_html_e( 'Published', 'buoy-video-sync' ); ?></option>
+					<option value="draft" <?php selected( $post_status, 'draft' ); ?>><?php esc_html_e( 'Draft', 'buoy-video-sync' ); ?></option>
+					<option value="private" <?php selected( $post_status, 'private' ); ?>><?php esc_html_e( 'Private', 'buoy-video-sync' ); ?></option>
 				</select>
 			</div>
 		</div>

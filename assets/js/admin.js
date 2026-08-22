@@ -590,6 +590,7 @@ function collectWizardRule(wizard) {
 	const customSched = parseInt(wizard.querySelector('.buoyvs-wizard-custom-schedule')?.value) || 24
 	const maxVideos   = parseInt(wizard.querySelector('.buoyvs-wizard-max-videos')?.value) || 0
 	const postType    = wizard.querySelector('.buoyvs-wizard-post-type')?.value ?? ''
+	const postStatus  = wizard.querySelector('.buoyvs-wizard-post-status')?.value ?? 'publish'
 
 	return {
 		action,
@@ -597,6 +598,7 @@ function collectWizardRule(wizard) {
 		custom_schedule:       customSched,
 		max_videos:            maxVideos,
 		destination_post_type: postType,
+		post_status:           postStatus,
 	}
 }
 

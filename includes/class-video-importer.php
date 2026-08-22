@@ -45,15 +45,16 @@ class Video_Importer {
 	 * @param string $source_type                 'channel' or 'playlist'.
 	 * @param int    $source_term_id              WordPress term ID of the source channel/playlist.
 	 * @param string $post_type                   Destination post type. Required and validated by the caller (Sync_Runner); an empty/invalid value is rejected before reaching here.
+	 * @param string $post_status                 Post status to create the post as. Defaults to 'publish'.
 	 * @return int|\WP_Error Post ID on success, WP_Error on failure.
 	 */
-	public function import( array $video_data, string $source_type, int $source_term_id, string $post_type = '' ): int|\WP_Error {
+	public function import( array $video_data, string $source_type, int $source_term_id, string $post_type = '', string $post_status = 'publish' ): int|\WP_Error {
 		// 1. Create the post.
 		$post_id = wp_insert_post(
 			array(
 				'post_title'  => sanitize_text_field( $video_data['title'] ?? '' ),
 				'post_type'   => $post_type,
-				'post_status' => 'publish',
+				'post_status' => $post_status,
 			),
 			true
 		);
@@ -213,14 +214,15 @@ class Video_Importer {
 	 * @param array  $playlist_data             Normalised playlist data from YouTube_API::get_channel_playlists().
 	 * @param string $channel_id                YouTube channel ID.
 	 * @param string $post_type                 Destination post type.
+	 * @param string $post_status               Post status to create the post as. Defaults to 'publish'.
 	 * @return int|\WP_Error Post ID on success, WP_Error on failure.
 	 */
-	public function import_playlist( array $playlist_data, string $channel_id, string $post_type ): int|\WP_Error {
+	public function import_playlist( array $playlist_data, string $channel_id, string $post_type, string $post_status = 'publish' ): int|\WP_Error {
 		$post_id = wp_insert_post(
 			array(
 				'post_title'  => sanitize_text_field( $playlist_data['playlist_title'] ?: $playlist_data['playlist_id'] ),
 				'post_type'   => $post_type,
-				'post_status' => 'publish',
+				'post_status' => $post_status,
 			),
 			true
 		);
@@ -310,14 +312,15 @@ class Video_Importer {
 	 * @param array  $channel_data              Channel data from YouTube_API::get_channel_data().
 	 * @param string $channel_id                YouTube channel ID.
 	 * @param string $post_type                 Destination post type.
+	 * @param string $post_status               Post status to create the post as. Defaults to 'publish'.
 	 * @return int|\WP_Error Post ID on success, WP_Error on failure.
 	 */
-	public function import_channel( array $channel_data, string $channel_id, string $post_type ): int|\WP_Error {
+	public function import_channel( array $channel_data, string $channel_id, string $post_type, string $post_status = 'publish' ): int|\WP_Error {
 		$post_id = wp_insert_post(
 			array(
 				'post_title'  => sanitize_text_field( $channel_data['channel_title'] ?? $channel_id ),
 				'post_type'   => $post_type,
-				'post_status' => 'publish',
+				'post_status' => $post_status,
 			),
 			true
 		);
