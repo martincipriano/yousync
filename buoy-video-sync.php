@@ -310,28 +310,62 @@ function buoyvs_admin_post_thumbnail_html( string $content, int $post_id, $thumb
 add_filter( 'admin_post_thumbnail_html', 'buoyvs_admin_post_thumbnail_html', 10, 3 );
 
 /**
- * Label a synced post as a YouTube Video/Playlist/Channel on post list screens.
+ * Add a "Sync Type" column before Title on post list screens, showing a
+ * Video/Playlist/Channel badge for synced posts. Registered on every post
+ * type's list table (destination post type is configurable per sync rule),
+ * so the cell is simply empty for unrelated posts; users can hide the
+ * column entirely via Screen Options.
  *
- * Uses the same 'display_post_states' mechanism WordPress uses for "— Draft",
- * "— Sticky", etc. — a plain-text tag next to the title, no new column. Only
- * ever adds the content-type label; any other state shown alongside it
- * (Draft, Sticky, ...) comes from core's own filters on the same array.
- *
- * @param string[] $post_states Existing post state labels, keyed by slug.
- * @param \WP_Post $post        The current row's post.
- * @return string[] Modified post state labels.
+ * @param string[] $columns Existing column headings, keyed by slug.
+ * @return string[] Modified column headings.
  */
-function buoyvs_display_post_states( array $post_states, \WP_Post $post ): array {
-	if ( get_post_meta( $post->ID, '_buoyvs_video_id', true ) ) {
-		$post_states['buoyvs_type'] = __( 'YouTube Video', 'buoy-video-sync' );
-	} elseif ( get_post_meta( $post->ID, '_buoyvs_playlist_id', true ) ) {
-		$post_states['buoyvs_type'] = __( 'YouTube Playlist', 'buoy-video-sync' );
-	} elseif ( get_post_meta( $post->ID, '_buoyvs_channel_post', true ) ) {
-		$post_states['buoyvs_type'] = __( 'YouTube Channel', 'buoy-video-sync' );
+function buoyvs_add_type_column( array $columns ): array {
+	$new = array();
+	foreach ( $columns as $key => $label ) {
+		if ( 'title' === $key ) {
+			$new['buoyvs_type'] = __( 'Sync Type', 'buoy-video-sync' );
+		}
+		$new[ $key ] = $label;
 	}
-	return $post_states;
+	return $new;
 }
-add_filter( 'display_post_states', 'buoyvs_display_post_states', 10, 2 );
+add_filter( 'manage_posts_columns', 'buoyvs_add_type_column' );
+add_filter( 'manage_pages_columns', 'buoyvs_add_type_column' );
+
+/**
+ * Render the "Sync Type" column content as a badge (see .buoyvs-type-badge
+ * in admin.scss).
+ *
+ * @param string $column  Column key being rendered.
+ * @param int    $post_id Current row's post ID.
+ * @return void
+ */
+function buoyvs_render_type_column( string $column, int $post_id ): void {
+	if ( 'buoyvs_type' !== $column ) {
+		return;
+	}
+
+	if ( get_post_meta( $post_id, '_buoyvs_video_id', true ) ) {
+		$type  = 'video';
+		$label = __( 'Video', 'buoy-video-sync' );
+	} elseif ( get_post_meta( $post_id, '_buoyvs_playlist_id', true ) ) {
+		$type  = 'playlist';
+		$label = __( 'Playlist', 'buoy-video-sync' );
+	} elseif ( get_post_meta( $post_id, '_buoyvs_channel_post', true ) ) {
+		$type  = 'channel';
+		$label = __( 'Channel', 'buoy-video-sync' );
+	} else {
+		return;
+	}
+
+	printf(
+		'<span class="buoyvs-type-badge buoyvs-type-badge--%1$s">%2$s</span>',
+		esc_attr( $type ),
+		esc_html( $label )
+	);
+}
+add_action( 'manage_posts_custom_column', 'buoyvs_render_type_column', 10, 2 );
+add_action( 'manage_pages_custom_column', 'buoyvs_render_type_column', 10, 2 );
 
 /**
  * Add playlist metabox to posts that were synced from a YouTube playlist.
@@ -414,13 +448,28 @@ function buoyvs_render_channel_metabox( $post ) {
 }
 
 /**
- * Enqueue assets on post edit screens where the post has Buoy Video Sync video meta.
+ * Enqueue assets on post edit screens where the post has Buoy Video Sync video meta,
+ * and the stylesheet alone on post list screens (for the Sync Type column badge).
  *
  * @return void
  */
 function buoyvs_enqueue_video_list_assets(): void {
 	$screen = get_current_screen();
-	if ( ! $screen || 'post' !== $screen->base ) {
+	if ( ! $screen ) {
+		return;
+	}
+
+	if ( 'edit' === $screen->base ) {
+		wp_enqueue_style(
+			'buoyvs-admin',
+			BUOYVS_PLUGIN_URL . 'assets/css/admin.css',
+			array(),
+			BUOYVS_VERSION
+		);
+		return;
+	}
+
+	if ( 'post' !== $screen->base ) {
 		return;
 	}
 

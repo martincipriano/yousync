@@ -274,6 +274,24 @@
   width: 33px;
 }
 
+.column-buoyvs_type {
+  width: 90px;
+}
+
+.buoyvs-type-badge {
+  background: var(--wp-admin-theme-color, #2271b1);
+  border-radius: 3px;
+  color: #fff;
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  padding: 3px 7px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
 .buoyvs-conditions:not(:has(.buoyvs-condition))::before {
   border: 1px dashed #c3c4c7;
   color: #8c8f94;
