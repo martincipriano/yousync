@@ -29,9 +29,10 @@ $subscriber_count    = isset( $channel['subscriber_count'] ) ? $channel['subscri
 $sync_rules          = $channel['sync_rules'] ?? array();
 $video_count         = $channel['video_count'] ?? 0;
 
-$post_types         = get_post_types( array( 'public' => true ), 'objects' );
-$default_post_type  = $channel['default_post_type'] ?? '';
-$_public_taxonomies = get_taxonomies( array( 'public' => true ) );
+$post_types           = get_post_types( array( 'public' => true ), 'objects' );
+$default_post_type    = $channel['default_post_type'] ?? '';
+$default_post_status  = $channel['default_post_status'] ?? 'publish';
+$_public_taxonomies   = get_taxonomies( array( 'public' => true ) );
 
 $profile_picture  = $channel['profile_picture'] ?? array();
 $profile_src      = '';
@@ -165,7 +166,8 @@ $name_prefix = 'channel[sync_rules]';
 				</div>
 				<?php
 				buoyvs_get_template_part( 'sync-rule-wizard', null, array(
-					'default_post_type' => $default_post_type,
+					'default_post_type'   => $default_post_type,
+					'default_post_status' => $default_post_status,
 				) );
 				?>
 
@@ -174,7 +176,7 @@ $name_prefix = 'channel[sync_rules]';
 			<?php /* Settings tab */ ?>
 			<div class="buoyvs-channel-tab-panel buoyvs-hidden" data-panel="settings" role="tabpanel">
 
-				<div class="buoyvs-2-columns buoyvs-cols-3-1">
+				<div class="buoyvs-2-columns">
 					<div class="buoyvs-form-group">
 						<label for="buoyvs-default-post-type">
 							<?php esc_html_e( 'Default Post Type', 'buoy-video-sync' ); ?>
@@ -192,6 +194,22 @@ $name_prefix = 'channel[sync_rules]';
 							<?php foreach ( $post_types as $pt ) : ?>
 							<option value="<?php echo esc_attr( $pt->name ); ?>" data-has-taxonomy="<?php echo array_intersect( get_object_taxonomies( $pt->name ), $_public_taxonomies ) ? '1' : '0'; ?>"<?php selected( $default_post_type, $pt->name ); ?>><?php echo esc_html( $pt->labels->singular_name ); ?></option>
 							<?php endforeach; ?>
+						</select>
+					</div>
+					<div class="buoyvs-form-group">
+						<label for="buoyvs-default-post-status">
+							<?php esc_html_e( 'Default Post Status', 'buoy-video-sync' ); ?>
+							<span class="buoyvs-help-wrap">
+								<button type="button" class="buoyvs-help-btn" aria-label="<?php esc_attr_e( 'More info', 'buoy-video-sync' ); ?>">?</button>
+								<span class="buoyvs-help-tooltip" role="tooltip"><?php esc_html_e( 'Pre-select this status when adding new sync rules for this channel.', 'buoy-video-sync' ); ?></span>
+							</span>
+						</label>
+						<select
+							id="buoyvs-default-post-status"
+							name="channel[default_post_status]"
+							class="buoyvs-select buoyvs-channel-default-post-status"
+						>
+							<?php buoyvs_get_template_part( 'options', 'post-status', array( 'selected' => $default_post_status ) ); ?>
 						</select>
 					</div>
 				</div>

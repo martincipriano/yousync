@@ -462,6 +462,10 @@ function wizardReset(wizard) {
 	const defaultPostType = wizard.dataset.defaultPostType
 	const ptSelect = wizard.querySelector('.buoyvs-wizard-post-type')
 	if (ptSelect && defaultPostType) ptSelect.value = defaultPostType
+	// Restore default post status from channel settings.
+	const defaultPostStatus = wizard.dataset.defaultPostStatus
+	const psSelect = wizard.querySelector('.buoyvs-wizard-post-status')
+	if (psSelect && defaultPostStatus) psSelect.value = defaultPostStatus
 }
 
 /**

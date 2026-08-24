@@ -9,7 +9,8 @@ declare(strict_types=1);
  * @package Buoy_Video_Sync
  *
  * Variables available in this template:
- * @var string $default_post_type Default destination post type for the channel.
+ * @var string $default_post_type   Default destination post type for the channel.
+ * @var string $default_post_status Default post status for the channel.
  */
 
 // Exit if accessed directly.
@@ -19,11 +20,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Template variables are local to buoyvs_get_template_part()'s extract()/include scope, not globals.
 
-$post_types         = get_post_types( array( 'public' => true ), 'objects' );
-$default_post_type  = $default_post_type ?? '';
-$_public_taxonomies = get_taxonomies( array( 'public' => true ) );
+$post_types           = get_post_types( array( 'public' => true ), 'objects' );
+$default_post_type    = $default_post_type ?? '';
+$default_post_status  = $default_post_status ?? 'publish';
+$_public_taxonomies   = get_taxonomies( array( 'public' => true ) );
 ?>
-<div class="buoyvs-wizard buoyvs-hidden" data-channel-index="0" data-default-post-type="<?php echo esc_attr( $default_post_type ); ?>">
+<div class="buoyvs-wizard buoyvs-hidden" data-channel-index="0" data-default-post-type="<?php echo esc_attr( $default_post_type ); ?>" data-default-post-status="<?php echo esc_attr( $default_post_status ); ?>">
 
 	<div class="buoyvs-wizard-progress" role="progressbar" aria-label="<?php esc_attr_e( 'Wizard progress', 'buoy-video-sync' ); ?>">
 		<span class="buoyvs-wizard-step-indicator buoyvs-wizard-step-indicator--active" data-step="1">1</span>
@@ -119,7 +121,7 @@ $_public_taxonomies = get_taxonomies( array( 'public' => true ) );
 			<div class="buoyvs-form-group">
 				<label for="buoyvs-wizard-post-status"><?php esc_html_e( 'Post status', 'buoy-video-sync' ); ?></label>
 				<select id="buoyvs-wizard-post-status" class="buoyvs-select buoyvs-wizard-post-status">
-					<?php buoyvs_get_template_part( 'options', 'post-status', array( 'selected' => 'publish' ) ); ?>
+					<?php buoyvs_get_template_part( 'options', 'post-status', array( 'selected' => $default_post_status ) ); ?>
 				</select>
 			</div>
 		</div>

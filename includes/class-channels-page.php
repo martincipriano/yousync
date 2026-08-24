@@ -297,6 +297,14 @@ class Channels_Page {
 			? sanitize_key( wp_unslash( $ch_data['default_post_type'] ) )
 			: '';
 
+		// Per-channel default post status — pre-selected when adding new sync rules.
+		$default_post_status = isset( $ch_data['default_post_status'] )
+			? sanitize_text_field( wp_unslash( $ch_data['default_post_status'] ) )
+			: 'publish';
+		$channel['default_post_status'] = in_array( $default_post_status, buoyvs_valid_post_statuses(), true )
+			? $default_post_status
+			: 'publish';
+
 		// Auto-fetch channel data via YouTube API if channel ID changed or data is missing.
 		if (
 			$api_key &&
